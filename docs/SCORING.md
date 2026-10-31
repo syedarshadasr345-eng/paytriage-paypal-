@@ -227,3 +227,4 @@ All weights, thresholds, cooldowns, and version metadata are isolated in `backen
 1. **Fixed Dollar Thresholds:** Amount tiers ($500, $2,000, $5,000) are default thresholds designed for small-to-medium business invoices and may require custom calibration for enterprise transactions.
 2. **Decision-Support Scope:** The score is a prioritization aid reflecting operational risk, not an empirical payment probability or recovery guarantee.
 3. **Data Dependency:** Accuracy of scoring depends strictly on verified invoice states, delivery audit logs, and verified payment promises recorded in the backend.
+4. **Reminder Count Source:** reminder_count currently comes from a stored column. In Phase 5 it must be derived from verified executed reminders in the audit log.

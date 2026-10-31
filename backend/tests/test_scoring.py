@@ -204,6 +204,102 @@ class TestTableDrivenBoundaries:
         assert res.score == expected_score
         assert res.priority == expected_priority
 
+    @pytest.mark.parametrize("test_name,inv_kwargs,expected_score,expected_priority", [
+        # Boundary 24 (LOW) vs 25 (MEDIUM)
+        (
+            "score_24_LOW",
+            {
+                "currency": "EUR",  # Non-USD: 0 amount pts
+                "due_date": TODAY - timedelta(days=5),  # 10 pts (1-7 days)
+                "reminder_count": 1,  # 6 pts
+                "payment_history": "mixed",  # 8 pts -> 10 + 0 + 6 + 8 = 24
+                "total_amount": Decimal("1000.00"),
+                "outstanding_amount": Decimal("1000.00"),
+            },
+            24,
+            "LOW",
+        ),
+        (
+            "score_25_MEDIUM",
+            {
+                "currency": "USD",
+                "due_date": TODAY - timedelta(days=10),  # 20 pts (8-14 days)
+                "reminder_count": 0,  # 0 pts
+                "payment_history": "on_time",  # 0 pts
+                "total_amount": Decimal("400.00"),  # 5 pts (< $500) -> 20 + 5 + 0 + 0 = 25
+                "outstanding_amount": Decimal("400.00"),
+            },
+            25,
+            "MEDIUM",
+        ),
+        # Boundary 49 (MEDIUM) vs 50 (HIGH)
+        (
+            "score_49_MEDIUM",
+            {
+                "currency": "USD",
+                "due_date": TODAY - timedelta(days=5),  # 10 pts (1-7 days)
+                "reminder_count": 2,  # 12 pts
+                "payment_history": "late",  # 15 pts
+                "total_amount": Decimal("1000.00"),  # 12 pts ($500-$2000) -> 10 + 12 + 12 + 15 = 49
+                "outstanding_amount": Decimal("1000.00"),
+            },
+            49,
+            "MEDIUM",
+        ),
+        (
+            "score_50_HIGH",
+            {
+                "currency": "USD",
+                "due_date": TODAY - timedelta(days=15),  # 30 pts (15-30 days)
+                "reminder_count": 0,  # 0 pts
+                "payment_history": "mixed",  # 8 pts
+                "total_amount": Decimal("1000.00"),  # 12 pts ($500-$2000) -> 30 + 12 + 0 + 8 = 50
+                "outstanding_amount": Decimal("1000.00"),
+            },
+            50,
+            "HIGH",
+        ),
+        # Boundary 74 (HIGH) vs 75 (CRITICAL)
+        (
+            "score_74_HIGH",
+            {
+                "currency": "USD",
+                "due_date": TODAY - timedelta(days=35),  # 40 pts (>30 days)
+                "reminder_count": 2,  # 12 pts
+                "payment_history": "on_time",  # 0 pts
+                "has_promise_to_pay": True,  # Broken promise: 10 pts (0 + 10 = 10 in D)
+                "promise_due_date": TODAY - timedelta(days=2),
+                "total_amount": Decimal("1000.00"),  # 12 pts ($500-$2000) -> 40 + 12 + 12 + 10 = 74
+                "outstanding_amount": Decimal("1000.00"),
+            },
+            74,
+            "HIGH",
+        ),
+        (
+            "score_75_CRITICAL",
+            {
+                "currency": "USD",
+                "due_date": TODAY - timedelta(days=35),  # 40 pts (>30 days)
+                "reminder_count": 2,  # 12 pts
+                "payment_history": None,  # Assumption: 5 pts
+                "total_amount": Decimal("2500.00"),  # 18 pts ($2000-$5000) -> 40 + 18 + 12 + 5 = 75
+                "outstanding_amount": Decimal("2500.00"),
+            },
+            75,
+            "CRITICAL",
+        ),
+    ])
+    def test_exact_priority_band_boundary_pairs(self, test_name, inv_kwargs, expected_score, expected_priority):
+        """Strictly verify boundaries: 24 vs 25 (LOW/MEDIUM), 49 vs 50 (MEDIUM/HIGH), 74 vs 75 (HIGH/CRITICAL)."""
+        inv = InvoiceInput(
+            invoice_id=f"INV-BOUND-{test_name}",
+            status="OVERDUE",
+            **inv_kwargs,
+        )
+        res = calculate_recovery_score(inv, today=TODAY)
+        assert res.score == expected_score, f"{test_name} failed score: expected {expected_score}, got {res.score}"
+        assert res.priority == expected_priority, f"{test_name} failed priority: expected {expected_priority}, got {res.priority}"
+
 
 class TestSpecialConditionsAndRules:
     """Tests for non-USD currencies, missing data, promises, and cooldowns."""

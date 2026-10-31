@@ -59,6 +59,20 @@ def init_db(db_path: Optional[Path] = None) -> None:
                 FOREIGN KEY (invoice_id) REFERENCES invoices (id)
             );
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS reminder_drafts (
+                id TEXT PRIMARY KEY,
+                invoice_id TEXT NOT NULL,
+                tone TEXT NOT NULL,
+                subject TEXT NOT NULL,
+                body TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'draft',
+                source TEXT NOT NULL DEFAULT 'ai',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (invoice_id) REFERENCES invoices (id)
+            );
+        """)
     conn.close()
 
 
@@ -95,10 +109,10 @@ def get_all_invoices(db_path: Optional[Path] = None) -> List[Dict[str, Any]]:
 
 
 def get_invoice_by_id(invoice_id: str, db_path: Optional[Path] = None) -> Optional[Dict[str, Any]]:
-    """Retrieve a single invoice by ID from SQLite."""
+    """Retrieve a single invoice by ID or invoice_number from SQLite."""
     conn = get_db_connection(db_path)
     try:
-        cur = conn.execute("SELECT * FROM invoices WHERE id = ?", (invoice_id,))
+        cur = conn.execute("SELECT * FROM invoices WHERE id = ? OR invoice_number = ?", (invoice_id, invoice_id))
         row = cur.fetchone()
         if row:
             return row_to_dict(row)
@@ -148,7 +162,121 @@ def clear_invoices(db_path: Optional[Path] = None) -> None:
     conn = get_db_connection(db_path)
     try:
         with conn:
+            conn.execute("DELETE FROM reminder_drafts;")
             conn.execute("DELETE FROM activity_logs;")
             conn.execute("DELETE FROM invoices;")
     finally:
         conn.close()
+
+
+def save_reminder_draft(draft: Dict[str, Any], db_path: Optional[Path] = None) -> None:
+    """Insert or replace a reminder draft record."""
+    conn = get_db_connection(db_path)
+    try:
+        with conn:
+            conn.execute("""
+                INSERT OR REPLACE INTO reminder_drafts (
+                    id, invoice_id, tone, subject, body, status, source, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                draft["id"],
+                draft["invoice_id"],
+                draft["tone"],
+                draft["subject"],
+                draft["body"],
+                draft.get("status", "draft"),
+                draft.get("source", "ai"),
+                draft.get("created_at", datetime.now().isoformat()),
+                draft.get("updated_at", datetime.now().isoformat()),
+            ))
+    finally:
+        conn.close()
+
+
+def get_reminder_draft(draft_id: str, db_path: Optional[Path] = None) -> Optional[Dict[str, Any]]:
+    """Retrieve a single reminder draft by ID."""
+    conn = get_db_connection(db_path)
+    try:
+        cur = conn.execute("SELECT * FROM reminder_drafts WHERE id = ?", (draft_id,))
+        row = cur.fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def update_reminder_draft(draft_id: str, updates: Dict[str, Any], db_path: Optional[Path] = None) -> Optional[Dict[str, Any]]:
+    """Update fields of an existing reminder draft."""
+    conn = get_db_connection(db_path)
+    try:
+        fields = []
+        values = []
+        for k, v in updates.items():
+            fields.append(f"{k} = ?")
+            values.append(v)
+        fields.append("updated_at = ?")
+        values.append(datetime.now().isoformat())
+        values.append(draft_id)
+
+        with conn:
+            conn.execute(f"UPDATE reminder_drafts SET {', '.join(fields)} WHERE id = ?", values)
+        return get_reminder_draft(draft_id, db_path=db_path)
+    finally:
+        conn.close()
+
+
+def list_reminder_drafts(invoice_id: Optional[str] = None, db_path: Optional[Path] = None) -> List[Dict[str, Any]]:
+    """List reminder drafts, optionally filtered by invoice_id."""
+    conn = get_db_connection(db_path)
+    try:
+        if invoice_id:
+            cur = conn.execute("SELECT * FROM reminder_drafts WHERE invoice_id = ? ORDER BY created_at DESC", (invoice_id,))
+        else:
+            cur = conn.execute("SELECT * FROM reminder_drafts ORDER BY created_at DESC")
+        return [dict(r) for r in cur.fetchall()]
+    finally:
+        conn.close()
+
+
+def log_activity(
+    invoice_id: str,
+    action_type: str,
+    status: str,
+    details: Optional[str] = None,
+    log_id: Optional[str] = None,
+    db_path: Optional[Path] = None,
+) -> Dict[str, Any]:
+    """Record an audit trail activity log entry."""
+    import uuid
+    conn = get_db_connection(db_path)
+    entry_id = log_id or f"ACT-{uuid.uuid4().hex[:8].upper()}"
+    ts = datetime.now().isoformat()
+    try:
+        with conn:
+            conn.execute("""
+                INSERT INTO activity_logs (id, invoice_id, action_type, status, details, timestamp)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (entry_id, invoice_id, action_type, status, details, ts))
+        return {
+            "id": entry_id,
+            "invoice_id": invoice_id,
+            "action_type": action_type,
+            "status": status,
+            "details": details,
+            "timestamp": ts,
+        }
+    finally:
+        conn.close()
+
+
+def get_activity_logs(invoice_id: Optional[str] = None, db_path: Optional[Path] = None) -> List[Dict[str, Any]]:
+    """Retrieve activity logs, optionally filtered by invoice_id."""
+    conn = get_db_connection(db_path)
+    try:
+        if invoice_id:
+            cur = conn.execute("SELECT * FROM activity_logs WHERE invoice_id = ? ORDER BY timestamp DESC", (invoice_id,))
+        else:
+            cur = conn.execute("SELECT * FROM activity_logs ORDER BY timestamp DESC")
+        return [dict(r) for r in cur.fetchall()]
+    finally:
+        conn.close()
+

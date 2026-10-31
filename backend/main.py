@@ -5,6 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.database import init_db, get_all_invoices
 from backend.seed import seed_database
 from backend.recovery.router import router as recovery_router
+from backend.ai.router import router as ai_router
+from backend.ai.config import is_gemini_available, GEMINI_MODEL
 from backend.recovery.config import SCORING_VERSION
 from backend.config import APP_NAME, APP_TAGLINE, APP_PACKAGE_NAME
 
@@ -38,6 +40,7 @@ app.add_middleware(
 
 # Include Routers
 app.include_router(recovery_router)
+app.include_router(ai_router)
 
 
 @app.get("/api/health", tags=["health"])
@@ -46,6 +49,9 @@ def health_check():
         "status": "healthy",
         "service": f"{APP_PACKAGE_NAME}-backend",
         "scoring_version": SCORING_VERSION,
+        "ai_provider": "gemini",
+        "gemini_model": GEMINI_MODEL,
+        "gemini_available": is_gemini_available(),
     }
 
 

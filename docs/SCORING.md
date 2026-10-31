@@ -2,7 +2,7 @@
 
 > **Version:** 1.0.0  
 > **Status:** Approved Specification (incorporating user amendments)  
-> **Target System:** InvoicePilot AI — Decision-Support Recovery Engine  
+> **Target System:** PayTriage — Decision-Support Recovery Engine  
 > **Rule Compliance:** Strictly conforms to `RULES.md` (§5, §9, §11) and `phase2.md`
 
 ---
@@ -10,7 +10,7 @@
 ## 1. Purpose and Disclaimer
 
 ### 1.1 Purpose
-The InvoicePilot AI Recovery Scoring Engine is a deterministic, fully explainable decision-support system. It computes a priority score ($0$ to $100$) for overdue and partially paid invoices to help businesses determine:
+The PayTriage Recovery Scoring Engine is a deterministic, fully explainable decision-support system. It computes a priority score ($0$ to $100$) for overdue and partially paid invoices to help businesses determine:
 1. Which invoices require attention first.
 2. Why an invoice is categorized as urgent or at risk.
 3. What next-best recovery action is recommended, supported by documented rules and verified data.

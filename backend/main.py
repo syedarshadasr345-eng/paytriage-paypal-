@@ -6,6 +6,7 @@ from backend.database import init_db, get_all_invoices
 from backend.seed import seed_database
 from backend.recovery.router import router as recovery_router
 from backend.recovery.config import SCORING_VERSION
+from backend.config import APP_NAME, APP_TAGLINE, APP_PACKAGE_NAME
 
 
 @asynccontextmanager
@@ -20,8 +21,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="InvoicePilot AI — Adaptive Payment Recovery Engine",
-    description="Explainable payment recovery intelligence for PayPal merchants. Scores overdue invoices, recommends next-best actions, and compares strategies.",
+    title=f"{APP_NAME} — {APP_TAGLINE}",
+    description=f"{APP_NAME}: {APP_TAGLINE} Explainable payment recovery intelligence for merchants. Scores overdue invoices, recommends next-best actions, and compares recovery strategies.",
     version=SCORING_VERSION,
     lifespan=lifespan,
 )
@@ -43,7 +44,7 @@ app.include_router(recovery_router)
 def health_check():
     return {
         "status": "healthy",
-        "service": "invoicepilot-ai-backend",
+        "service": f"{APP_PACKAGE_NAME}-backend",
         "scoring_version": SCORING_VERSION,
     }
 
@@ -51,7 +52,7 @@ def health_check():
 @app.get("/", tags=["root"])
 def root():
     return {
-        "app": "InvoicePilot AI — Payment Recovery Agent",
+        "app": f"{APP_NAME} — {APP_TAGLINE}",
         "scoring_version": SCORING_VERSION,
         "docs_url": "/docs",
         "health_check": "/api/health",

@@ -1,4 +1,4 @@
-# RULES.md — InvoicePilot AI
+# RULES.md — PayTriage
 
 > Standing rules for every session. Read this file fully before doing any work.
 > If a phase prompt conflicts with this file, stop and ask me.
@@ -9,7 +9,7 @@
 
 Act as a senior full-stack engineer, AI product architect, fintech UX designer, and hackathon technical mentor.
 
-I am building **InvoicePilot AI — Adaptive Payment Recovery Agent** for the PayPal AI Hackathon. The goal is a polished, functional, technically strong product with meaningful PayPal + AI integration.
+I am building **PayTriage — Adaptive Payment Recovery Agent** (tagline: *"Know which unpaid invoices need you first, and why."*) for the PayPal AI Hackathon. The goal is a polished, functional, technically strong product with meaningful PayPal + AI integration.
 
 **Do NOT rebuild the project from scratch.** Inspect the existing repository, understand its architecture, and improve what is already implemented.
 
@@ -17,7 +17,7 @@ I am building **InvoicePilot AI — Adaptive Payment Recovery Agent** for the Pa
 
 ## 2. Product Vision
 
-InvoicePilot AI is an intelligent payment recovery platform. It is **not** just an invoice dashboard or an automatic reminder app.
+PayTriage is an intelligent payment recovery platform. It is **not** just an invoice dashboard or an automatic reminder app.
 
 It must answer:
 
@@ -34,7 +34,7 @@ It must answer:
 
 The sentence judges should remember:
 
-> "InvoicePilot AI doesn't just remind businesses about unpaid invoices. It explains which invoices need attention, recommends an appropriate recovery strategy, prepares the communication, and lets the business owner approve and verify every action."
+> "PayTriage doesn't just remind businesses about unpaid invoices. It explains which invoices need attention, recommends an appropriate recovery strategy, prepares the communication, and lets the business owner approve and verify every action."
 
 ---
 

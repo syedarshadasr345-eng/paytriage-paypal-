@@ -1,5 +1,5 @@
 """
-InvoicePilot AI — Demo Database Seed Script
+PayTriage — Demo Database Seed Script
 Clearly labelled DEMO DATA for development and live demonstration.
 Contains test cases covering all required boundary and operational states.
 """

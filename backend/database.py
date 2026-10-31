@@ -9,7 +9,7 @@ DEFAULT_DB_PATH = Path(__file__).resolve().parent / "invoices.db"
 
 
 def get_db_path() -> Path:
-    env_path = os.getenv("INVOICEPILOT_DB_PATH")
+    env_path = os.getenv("PAYTRIAGE_DB_PATH")
     if env_path:
         return Path(env_path)
     return DEFAULT_DB_PATH

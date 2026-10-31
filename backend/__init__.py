@@ -1,1 +1,1 @@
-# InvoicePilot AI Backend Package
+# PayTriage Backend Package

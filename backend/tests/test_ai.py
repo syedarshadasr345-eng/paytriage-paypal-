@@ -163,6 +163,21 @@ class TestGroundedExplanation:
         assert res.source == "template_fallback"
         assert "Generated without AI" in res.confidence_note
 
+    def test_slow_provider_triggers_fallback_with_reason_timeout(self):
+        """Slow provider times out and triggers fallback with fallback_reason='timeout'."""
+        inv_id = "INV-HIGH-008"
+
+        class MockSlowTimeoutClient:
+            def generate_json(self, prompt, system_instruction=None, response_schema=None):
+                from backend.ai.client import AITimeoutError
+                raise AITimeoutError("Request timed out after 15.0s contacting generativelanguage.googleapis.com")
+
+        res = explain_invoice_recovery(inv_id, today=TODAY, client=MockSlowTimeoutClient())
+        assert res.invoice_id == inv_id
+        assert res.source == "template_fallback"
+        assert res.fallback_reason == "timeout"
+        assert "Generated without AI" in res.confidence_note
+
     def test_ai_invented_amount_rejected(self):
         """AI inventing a non-existent amount ($99,999.00) is rejected by validator."""
         inv_id = "INV-SEV-009"
@@ -265,6 +280,21 @@ class TestReminderGenerator:
         assert data["status"] == "draft"
         assert "Reminder Sent" not in data["subject"]
         assert "Reminder Sent" not in data["body"]
+
+    def test_reminder_slow_provider_triggers_timeout_fallback(self):
+        """When reminder generator times out, fallback engages with fallback_reason='timeout'."""
+        inv_id = "INV-SEV-009"
+
+        class MockSlowTimeoutClient:
+            def generate_json(self, prompt, system_instruction=None, response_schema=None):
+                from backend.ai.client import AITimeoutError
+                raise AITimeoutError("Request timed out after 15.0s")
+
+        draft = generate_or_regenerate_reminder(inv_id, tone="firm", client=MockSlowTimeoutClient())
+        assert draft.invoice_id == inv_id
+        assert draft.source == "template_fallback"
+        assert draft.fallback_reason == "timeout"
+        assert draft.status == "draft"
 
     def test_reminder_edit_lifecycle(self, client):
         """Merchant can edit draft subject and body; state remains 'draft'."""

@@ -28,7 +28,13 @@ from backend.ai.schemas import (
     ReminderEditRequest,
 )
 from backend.ai.prompts import REMINDER_SYSTEM_INSTRUCTION, build_reminder_prompt
-from backend.ai.client import get_ai_client, AIClientError, AISchemaValidationError
+from backend.ai.client import (
+    get_ai_client,
+    AIClientError,
+    AISchemaValidationError,
+    AITimeoutError,
+    AIProviderUnavailableError,
+)
 
 
 def get_deterministic_template(facts: Dict[str, Any], tone: ReminderTone) -> Tuple[str, str]:
@@ -145,6 +151,7 @@ def generate_or_regenerate_reminder(
 
     ai_client = client or get_ai_client()
     chosen_source = "ai"
+    fallback_reason: Optional[str] = None
     subject: Optional[str] = None
     body: Optional[str] = None
 
@@ -163,10 +170,28 @@ def generate_or_regenerate_reminder(
             body = cand_body
         else:
             chosen_source = "template_fallback"
+            fallback_reason = "validation_failed"
             subject, body = get_deterministic_template(facts, tone)
 
-    except (AIClientError, AISchemaValidationError, Exception):
+    except AITimeoutError:
         chosen_source = "template_fallback"
+        fallback_reason = "timeout"
+        subject, body = get_deterministic_template(facts, tone)
+    except AIProviderUnavailableError:
+        chosen_source = "template_fallback"
+        fallback_reason = "provider_unavailable"
+        subject, body = get_deterministic_template(facts, tone)
+    except AISchemaValidationError:
+        chosen_source = "template_fallback"
+        fallback_reason = "schema_validation_failed"
+        subject, body = get_deterministic_template(facts, tone)
+    except Exception as exc:
+        chosen_source = "template_fallback"
+        clean_msg = str(exc).lower()
+        if "timeout" in clean_msg or "timed out" in clean_msg:
+            fallback_reason = "timeout"
+        else:
+            fallback_reason = "provider_error"
         subject, body = get_deterministic_template(facts, tone)
 
     draft_id = f"DRF-{uuid.uuid4().hex[:8].upper()}"
@@ -180,6 +205,7 @@ def generate_or_regenerate_reminder(
         "body": body,
         "status": "draft",  # Strict invariant: starts in draft state
         "source": chosen_source,
+        "fallback_reason": fallback_reason,
         "created_at": now_iso,
         "updated_at": now_iso,
     }

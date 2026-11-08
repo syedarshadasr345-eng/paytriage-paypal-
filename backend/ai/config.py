@@ -24,12 +24,12 @@ else:
     load_dotenv()
 
 # Active Gemini production model (Current official GenAI SDK standard)
-DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", DEFAULT_GEMINI_MODEL)
 
 # Operational limits
 AI_TIMEOUT_SECONDS = float(os.getenv("AI_TIMEOUT_SECONDS", "15.0"))
-AI_MAX_RETRIES = int(os.getenv("AI_MAX_RETRIES", "2"))
+AI_MAX_RETRIES = int(os.getenv("AI_MAX_RETRIES", "1"))
 
 logger = logging.getLogger("paytriage.ai")
 

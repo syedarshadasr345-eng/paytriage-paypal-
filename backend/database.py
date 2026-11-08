@@ -68,11 +68,17 @@ def init_db(db_path: Optional[Path] = None) -> None:
                 body TEXT NOT NULL,
                 status TEXT NOT NULL DEFAULT 'draft',
                 source TEXT NOT NULL DEFAULT 'ai',
+                fallback_reason TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
                 FOREIGN KEY (invoice_id) REFERENCES invoices (id)
             );
         """)
+        # Safe column addition if table already existed
+        try:
+            conn.execute("ALTER TABLE reminder_drafts ADD COLUMN fallback_reason TEXT;")
+        except sqlite3.OperationalError:
+            pass
     conn.close()
 
 
@@ -176,8 +182,8 @@ def save_reminder_draft(draft: Dict[str, Any], db_path: Optional[Path] = None) -
         with conn:
             conn.execute("""
                 INSERT OR REPLACE INTO reminder_drafts (
-                    id, invoice_id, tone, subject, body, status, source, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    id, invoice_id, tone, subject, body, status, source, fallback_reason, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 draft["id"],
                 draft["invoice_id"],
@@ -186,6 +192,7 @@ def save_reminder_draft(draft: Dict[str, Any], db_path: Optional[Path] = None) -
                 draft["body"],
                 draft.get("status", "draft"),
                 draft.get("source", "ai"),
+                draft.get("fallback_reason"),
                 draft.get("created_at", datetime.now().isoformat()),
                 draft.get("updated_at", datetime.now().isoformat()),
             ))

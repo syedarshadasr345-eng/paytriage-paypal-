@@ -15,7 +15,13 @@ from backend.recovery.scoring import calculate_recovery_score
 from backend.recovery.actions import determine_next_best_action
 from backend.ai.schemas import ExplanationResponse
 from backend.ai.prompts import EXPLAINER_SYSTEM_INSTRUCTION, build_explainer_prompt
-from backend.ai.client import get_ai_client, AIClientError, AISchemaValidationError
+from backend.ai.client import (
+    get_ai_client,
+    AIClientError,
+    AISchemaValidationError,
+    AITimeoutError,
+    AIProviderUnavailableError,
+)
 from backend.ai.config import is_gemini_available
 
 
@@ -91,7 +97,10 @@ def compile_verified_facts(inv: Dict[str, Any], today: Optional[date] = None) ->
     }
 
 
-def generate_template_fallback_explanation(facts: Dict[str, Any]) -> ExplanationResponse:
+def generate_template_fallback_explanation(
+    facts: Dict[str, Any],
+    fallback_reason: Optional[str] = None,
+) -> ExplanationResponse:
     """Deterministic, rule-based explanation when AI is unavailable or validation fails.
     Conforms strictly to phase3.md Step 2: Labeled 'Generated without AI'.
     """
@@ -132,6 +141,7 @@ def generate_template_fallback_explanation(facts: Dict[str, Any]) -> Explanation
         unavailable_information=unavailable,
         caveats=caveats,
         source="template_fallback",
+        fallback_reason=fallback_reason,
         confidence_note="Generated without AI (deterministic rule-based fallback).",
         generated_at=datetime.now().isoformat(),
     )
@@ -196,6 +206,7 @@ def validate_ai_explanation(ai_data: Dict[str, Any], facts: Dict[str, Any]) -> b
 def explain_invoice_recovery(
     invoice_id: str,
     today: Optional[date] = None,
+    question: Optional[str] = None,
     client=None,
 ) -> ExplanationResponse:
     """Generate grounded recovery explanation for an invoice.
@@ -210,9 +221,11 @@ def explain_invoice_recovery(
     # Use provided client or default global client
     ai_client = client or get_ai_client()
 
+    fallback_reason: Optional[str] = None
+
     # Try AI generation
     try:
-        prompt = build_explainer_prompt(facts)
+        prompt = build_explainer_prompt(facts, question=question)
         ai_json = ai_client.generate_json(
             prompt=prompt,
             system_instruction=EXPLAINER_SYSTEM_INSTRUCTION,
@@ -247,17 +260,28 @@ def explain_invoice_recovery(
                 details="Grounded AI explanation successfully generated and validated.",
             )
             return resp
+        else:
+            fallback_reason = "validation_failed"
 
-    except (AIClientError, AISchemaValidationError, Exception):
-        # AI failed, timed out, or produced unvalidated data -> fallback seamlessly
-        pass
+    except AITimeoutError:
+        fallback_reason = "timeout"
+    except AIProviderUnavailableError:
+        fallback_reason = "provider_unavailable"
+    except AISchemaValidationError:
+        fallback_reason = "schema_validation_failed"
+    except Exception as exc:
+        clean_msg = str(exc).lower()
+        if "timeout" in clean_msg or "timed out" in clean_msg:
+            fallback_reason = "timeout"
+        else:
+            fallback_reason = "provider_error"
 
     # Deterministic template fallback
-    fallback_resp = generate_template_fallback_explanation(facts)
+    fallback_resp = generate_template_fallback_explanation(facts, fallback_reason=fallback_reason)
     log_activity(
         invoice_id=invoice_id,
         action_type="ai_explain",
         status="fallback",
-        details="Deterministic rule-based explanation generated without AI.",
+        details=f"Deterministic rule-based explanation generated without AI (reason: {fallback_reason}).",
     )
     return fallback_resp

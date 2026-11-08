@@ -8,6 +8,7 @@ import json
 import logging
 import time
 from typing import Optional, Dict, Any, Type
+import httpx
 from pydantic import BaseModel
 
 from backend.ai.config import (
@@ -25,6 +26,11 @@ logger = logging.getLogger("paytriage.ai.client")
 
 class AIClientError(Exception):
     """Base exception for AI client failures."""
+    pass
+
+
+class AITimeoutError(AIClientError):
+    """Raised when the AI provider request times out."""
     pass
 
 
@@ -49,7 +55,7 @@ class GeminiClient:
         self._sdk_client = None
 
     def _get_sdk_client(self):
-        """Lazy-initialize google-genai client."""
+        """Lazy-initialize google-genai client with request timeout."""
         if not self._api_key:
             raise AIProviderUnavailableError(
                 "GEMINI_API_KEY is not configured in backend/.env or environment. "
@@ -58,7 +64,14 @@ class GeminiClient:
         if self._sdk_client is None:
             try:
                 from google import genai
-                self._sdk_client = genai.Client(api_key=self._api_key)
+                from google.genai import types
+                # HttpOptions timeout is configured in milliseconds per official google-genai SDK docs
+                timeout_ms = int(AI_TIMEOUT_SECONDS * 1000)
+                http_options = types.HttpOptions(timeout=timeout_ms)
+                self._sdk_client = genai.Client(
+                    api_key=self._api_key,
+                    http_options=http_options,
+                )
             except Exception as e:
                 clean_err = redact_sensitive_data(str(e))
                 logger.error(f"Failed to initialize google-genai client: {clean_err}")
@@ -79,8 +92,13 @@ class GeminiClient:
 
         from google.genai import types
 
+        # Per google.genai.types.HttpOptions docs: timeout is in milliseconds
+        timeout_ms = int(AI_TIMEOUT_SECONDS * 1000)
+        http_options = types.HttpOptions(timeout=timeout_ms)
+
         config_kwargs: Dict[str, Any] = {
             "temperature": 0.2,  # Low temperature for grounded recovery intelligence
+            "http_options": http_options,
         }
 
         if system_instruction:
@@ -96,7 +114,7 @@ class GeminiClient:
         last_error = None
         for attempt in range(1, AI_MAX_RETRIES + 1):
             try:
-                logger.info(f"Dispatching Gemini request (model={self.model}, attempt={attempt}/{AI_MAX_RETRIES})")
+                logger.info(f"Dispatching Gemini request (model={self.model}, attempt={attempt}/{AI_MAX_RETRIES}, timeout={AI_TIMEOUT_SECONDS}s)")
                 
                 # Execute generation call
                 response = sdk_client.models.generate_content(
@@ -116,6 +134,17 @@ class GeminiClient:
                 logger.warning(
                     f"Gemini generation attempt {attempt} failed: {clean_msg}"
                 )
+
+                # Check if failure is due to request timeout
+                is_timeout = (
+                    isinstance(exc, (TimeoutError, httpx.TimeoutException))
+                    or "timeout" in clean_msg.lower()
+                    or "timed out" in clean_msg.lower()
+                )
+                if is_timeout:
+                    logger.error(f"Gemini request timed out after {AI_TIMEOUT_SECONDS}s: {clean_msg}")
+                    raise AITimeoutError(f"Gemini request timed out after {AI_TIMEOUT_SECONDS}s: {clean_msg}")
+
                 if attempt < AI_MAX_RETRIES:
                     time.sleep(0.5 * attempt)
 

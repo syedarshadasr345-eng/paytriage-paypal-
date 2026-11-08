@@ -376,9 +376,10 @@ class TestInteractiveAssistant:
 
 
 # =============================================================================
-# Live Smoke Test Check
+# Live Smoke Test Check (Opt-in only via @pytest.mark.live_ai and RUN_LIVE_AI=1)
 # =============================================================================
 
+@pytest.mark.live_ai
 def test_live_smoke_test_status():
     """Report live smoke test status based on real GEMINI_API_KEY presence."""
     api_key = get_gemini_api_key()

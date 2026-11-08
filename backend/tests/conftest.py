@@ -77,7 +77,7 @@ def isolate_ai_environment(request, monkeypatch):
     is_live = request.node.get_closest_marker("live_ai") is not None
 
     if is_live:
-        if os.getenv("RUN_LIVE_AI") != "1":
+        if os.getenv("RUN_LIVE_AI", "").strip() != "1":
             pytest.skip("Live AI test skipped by default. Set RUN_LIVE_AI=1 to opt-in.")
         # Live execution allowed with real credentials
         yield

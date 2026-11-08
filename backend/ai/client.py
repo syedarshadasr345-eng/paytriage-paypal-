@@ -135,11 +135,12 @@ class GeminiClient:
                     f"Gemini generation attempt {attempt} failed: {clean_msg}"
                 )
 
-                # Check if failure is due to request timeout
+                # Check if failure is due to request timeout or deadline expiration
                 is_timeout = (
                     isinstance(exc, (TimeoutError, httpx.TimeoutException))
                     or "timeout" in clean_msg.lower()
                     or "timed out" in clean_msg.lower()
+                    or "deadline" in clean_msg.lower()
                 )
                 if is_timeout:
                     logger.error(f"Gemini request timed out after {AI_TIMEOUT_SECONDS}s: {clean_msg}")

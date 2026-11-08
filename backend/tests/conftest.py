@@ -94,3 +94,21 @@ def isolate_ai_environment(request, monkeypatch):
         yield mock_client
     finally:
         set_ai_client(None)
+
+
+@pytest.fixture(autouse=True)
+def isolate_paypal_environment(request):
+    """Ensure normal test suite NEVER calls real PayPal API without opt-in.
+    Live tests must be marked with @pytest.mark.live_paypal and require RUN_LIVE_PAYPAL=1.
+    """
+    is_live = request.node.get_closest_marker("live_paypal") is not None
+
+    if is_live:
+        if os.getenv("RUN_LIVE_PAYPAL", "").strip() != "1":
+            pytest.skip("Live PayPal test skipped by default. Set RUN_LIVE_PAYPAL=1 to opt-in.")
+        yield
+        return
+
+    from backend.paypal.auth import get_auth_manager
+    get_auth_manager().clear_cache()
+    yield

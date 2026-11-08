@@ -7,6 +7,8 @@ from backend.database import init_db, get_all_invoices
 from backend.seed import seed_database
 from backend.recovery.router import router as recovery_router
 from backend.ai.router import router as ai_router
+from backend.paypal.router import router as paypal_router
+from backend.paypal.config import is_paypal_configured
 from backend.ai.config import is_gemini_available, GEMINI_MODEL
 from backend.recovery.config import SCORING_VERSION
 from backend.config import APP_NAME, APP_TAGLINE, APP_PACKAGE_NAME
@@ -49,6 +51,7 @@ app.add_middleware(
 # Include Routers
 app.include_router(recovery_router)
 app.include_router(ai_router)
+app.include_router(paypal_router)
 
 
 @app.get("/api/health", tags=["health"])
@@ -60,6 +63,7 @@ def health_check():
         "ai_provider": "gemini",
         "gemini_model": GEMINI_MODEL,
         "gemini_available": is_gemini_available(),
+        "paypal_configured": is_paypal_configured(),
     }
 
 

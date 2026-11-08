@@ -67,13 +67,13 @@ def get_deterministic_template(facts: Dict[str, Any], tone: ReminderTone) -> Tup
             f"Best regards,\nAccounts Receivable Team"
         )
     elif tone == "firm":
-        subject = f"OVERDUE NOTICE: Invoice {inv_num} requires immediate attention"
+        subject = f"Overdue Payment Notice: Invoice {inv_num}"
         body = (
             f"Dear {customer},\n\n"
-            f"Our records show that Invoice {inv_num} for {amt_str} remains outstanding beyond its due date of {due_str}.\n\n"
-            f"To keep your account in good standing and prevent service disruption, please arrange for immediate payment today. "
-            f"If you need to discuss payment terms or have already remitted payment, contact us immediately.\n\n"
-            f"Sincerely,\nCredit & Collections Department"
+            f"Our records show that Invoice {inv_num} for {amt_str} remains outstanding past its due date of {due_str}.\n\n"
+            f"Please arrange payment of the outstanding balance of {amt_str} as soon as possible. "
+            f"If payment has already been remitted or if you have any questions regarding this invoice, please contact our accounts department directly.\n\n"
+            f"Sincerely,\nAccounts Receivable Team"
         )
     else:  # professional (default)
         subject = f"Statement of Account: Invoice {inv_num}"
@@ -124,16 +124,32 @@ def validate_reminder_text(subject: str, body: str, facts: Dict[str, Any]) -> bo
 
 def generate_or_regenerate_reminder(
     invoice_id: str,
-    tone: ReminderTone = "polite",
+    tone: Optional[ReminderTone] = None,
     client=None,
 ) -> ReminderDraftResponse:
     """Generate or regenerate a reminder draft.
     Saves the result to SQLite reminder_drafts with status 'draft'.
     Never displays 'Reminder Sent'.
+    If tone is omitted, defaults based on recommended action (polite, firm, else professional).
     """
     inv = get_invoice_by_id(invoice_id)
     if not inv:
         raise ValueError(f"Invoice '{invoice_id}' not found.")
+
+    from backend.ai.explainer import invoice_to_input
+    from backend.recovery.actions import determine_next_best_action
+    
+    # Resolve tone: explicit override or default derived from recommended action
+    if tone is not None:
+        resolved_tone: ReminderTone = tone
+    else:
+        rec_action, _ = determine_next_best_action(invoice_to_input(inv), datetime.now().date())
+        if rec_action == "send_firm_followup":
+            resolved_tone = "firm"
+        elif rec_action == "send_polite_reminder":
+            resolved_tone = "polite"
+        else:
+            resolved_tone = "professional"
 
     facts = {
         "id": inv["id"],
@@ -156,7 +172,7 @@ def generate_or_regenerate_reminder(
     body: Optional[str] = None
 
     try:
-        prompt = build_reminder_prompt(facts, tone=tone)
+        prompt = build_reminder_prompt(facts, tone=resolved_tone)
         ai_json = ai_client.generate_json(
             prompt=prompt,
             system_instruction=REMINDER_SYSTEM_INSTRUCTION,
@@ -171,20 +187,20 @@ def generate_or_regenerate_reminder(
         else:
             chosen_source = "template_fallback"
             fallback_reason = "validation_failed"
-            subject, body = get_deterministic_template(facts, tone)
+            subject, body = get_deterministic_template(facts, resolved_tone)
 
     except AITimeoutError:
         chosen_source = "template_fallback"
         fallback_reason = "timeout"
-        subject, body = get_deterministic_template(facts, tone)
+        subject, body = get_deterministic_template(facts, resolved_tone)
     except AIProviderUnavailableError:
         chosen_source = "template_fallback"
         fallback_reason = "provider_unavailable"
-        subject, body = get_deterministic_template(facts, tone)
+        subject, body = get_deterministic_template(facts, resolved_tone)
     except AISchemaValidationError:
         chosen_source = "template_fallback"
         fallback_reason = "schema_validation_failed"
-        subject, body = get_deterministic_template(facts, tone)
+        subject, body = get_deterministic_template(facts, resolved_tone)
     except Exception as exc:
         chosen_source = "template_fallback"
         clean_msg = str(exc).lower()
@@ -192,7 +208,7 @@ def generate_or_regenerate_reminder(
             fallback_reason = "timeout"
         else:
             fallback_reason = "provider_error"
-        subject, body = get_deterministic_template(facts, tone)
+        subject, body = get_deterministic_template(facts, resolved_tone)
 
     draft_id = f"DRF-{uuid.uuid4().hex[:8].upper()}"
     now_iso = datetime.now().isoformat()
@@ -200,7 +216,7 @@ def generate_or_regenerate_reminder(
     draft_record = {
         "id": draft_id,
         "invoice_id": invoice_id,
-        "tone": tone,
+        "tone": resolved_tone,
         "subject": subject,
         "body": body,
         "status": "draft",  # Strict invariant: starts in draft state

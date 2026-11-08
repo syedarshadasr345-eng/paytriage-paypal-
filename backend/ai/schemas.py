@@ -42,7 +42,7 @@ ReminderTone = Literal["professional", "friendly", "polite", "firm"]
 
 class ReminderCreateRequest(BaseModel):
     """Request to generate a reminder draft for an invoice."""
-    tone: ReminderTone = Field("polite", description="Tone of the reminder: professional, friendly, polite, or firm.")
+    tone: Optional[ReminderTone] = Field(None, description="Tone of the reminder: professional, friendly, polite, or firm. Defaults based on recommended action if not specified.")
 
 
 class ReminderEditRequest(BaseModel):

@@ -56,11 +56,12 @@ def explain_invoice_endpoint(
 @router.post("/invoices/{id}/reminder", response_model=ReminderDraftResponse)
 def generate_reminder_endpoint(
     id: str = Path(..., description="Invoice ID to draft reminder for"),
-    req: ReminderCreateRequest = ReminderCreateRequest(tone="polite"),
+    req: Optional[ReminderCreateRequest] = None,
 ):
     """Generate or regenerate a payment reminder draft (draft status only, never sent)."""
+    tone = req.tone if req else None
     try:
-        return generate_or_regenerate_reminder(invoice_id=id, tone=req.tone)
+        return generate_or_regenerate_reminder(invoice_id=id, tone=tone)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:

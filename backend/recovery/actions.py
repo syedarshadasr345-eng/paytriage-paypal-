@@ -87,15 +87,18 @@ def determine_next_best_action(invoice: InvoiceInput, today: date) -> Tuple[str,
 
     # 10. Firm Follow-up Progression (15–45 days overdue or 2 prior reminders delivered)
     if days_overdue > 14 or invoice.reminder_count == 2:
-        return (
-            "send_firm_followup",
-            f"Invoice is significantly overdue ({days_overdue} days) or prior polite reminders ({invoice.reminder_count}) "
-            f"yielded no payment. A firm follow-up is required."
-        )
+        if days_overdue > 14 and invoice.reminder_count >= 2:
+            reason = f"Invoice is significantly overdue ({days_overdue} days) and prior reminders ({invoice.reminder_count}) yielded no payment. A firm follow-up is required."
+        elif days_overdue > 14:
+            reason = f"Invoice is significantly overdue ({days_overdue} days). A firm follow-up is required."
+        else:
+            reason = f"Prior polite reminders ({invoice.reminder_count}) yielded no payment. A firm follow-up is required."
+        return ("send_firm_followup", reason)
 
     # 11. Polite Reminder (Default for 1–14 days overdue with 0–1 prior follow-ups)
+    overdue_desc = "newly overdue" if days_overdue <= 7 else "moderately overdue"
     return (
         "send_polite_reminder",
-        f"Invoice is newly overdue ({days_overdue} days) with {invoice.reminder_count} prior follow-ups. "
+        f"Invoice is {overdue_desc} ({days_overdue} days) with {invoice.reminder_count} prior follow-ups. "
         f"A polite payment reminder preserves the customer relationship while prompting settlement."
     )

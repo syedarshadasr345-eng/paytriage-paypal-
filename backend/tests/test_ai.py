@@ -430,6 +430,161 @@ class TestInteractiveAssistant:
 
 
 # =============================================================================
+# Template Bug Fixes (B1 - B4) Unit Tests
+# =============================================================================
+
+class TestTemplateBugFixes:
+    """Verify B1-B4 bug fixes per requirements."""
+
+    def test_b1_unavailable_information_empty_when_all_populated(self, client):
+        """B1: unavailable_information is [] when nothing is unavailable."""
+        from backend.database import insert_invoice, get_db_connection
+        full_inv = {
+            "id": "INV-TEST-FULL-001",
+            "invoice_number": "INV-TEST-FULL-001",
+            "customer_name": "Acme Corp",
+            "customer_email": "billing@acme.com",
+            "total_amount": Decimal("1000.00"),
+            "outstanding_amount": Decimal("1000.00"),
+            "currency": "USD",
+            "status": "SENT",
+            "due_date": TODAY - pytest.importorskip("datetime").timedelta(days=10),
+            "reminder_count": 1,
+            "last_reminder_date": TODAY - pytest.importorskip("datetime").timedelta(days=3),
+            "payment_history": "good",
+            "has_promise_to_pay": False,
+            "promise_due_date": None,
+            "notes": "Verified good customer account notes.",
+            "is_demo": False,
+        }
+        insert_invoice(full_inv)
+        try:
+            # Force template fallback
+            set_ai_client(MockFailingGeminiClient())
+            res = client.post(f"/api/ai/invoices/INV-TEST-FULL-001/explain?today={TODAY.isoformat()}")
+            assert res.status_code == 200
+            data = res.json()
+            assert data["source"] == "template_fallback"
+            assert data["unavailable_information"] == []
+        finally:
+            conn = get_db_connection()
+            with conn:
+                conn.execute("DELETE FROM reminder_drafts WHERE invoice_id = ?", ("INV-TEST-FULL-001",))
+                conn.execute("DELETE FROM activity_logs WHERE invoice_id = ?", ("INV-TEST-FULL-001",))
+                conn.execute("DELETE FROM invoices WHERE id = ?", ("INV-TEST-FULL-001",))
+            conn.close()
+            set_ai_client(None)
+
+    def test_b2_no_double_dots_in_summary(self, client):
+        """B2: no '..' at the end of explanation summaries."""
+        set_ai_client(MockFailingGeminiClient())
+        try:
+            for inv_id in ["INV-SEV-009", "INV-HIGH-008", "INV-MOD-007"]:
+                res = client.post(f"/api/ai/invoices/{inv_id}/explain?today={TODAY.isoformat()}")
+                assert res.status_code == 200
+                summary = res.json()["summary"]
+                assert not summary.endswith("..")
+                assert not summary.endswith("...")
+        finally:
+            set_ai_client(None)
+
+    def test_b3_explanation_wording_only_mentions_applicable_rule(self):
+        """B3: explanation wording only mentions the rule that applies."""
+        from datetime import timedelta
+        from backend.recovery.models import InvoiceInput
+        from backend.recovery.actions import determine_next_best_action
+
+        # Case 1: 10-day overdue invoice (moderately overdue, NOT newly overdue)
+        inv_10d = InvoiceInput(
+            invoice_id="INV-10D",
+            customer_name="Test",
+            total_amount=Decimal("500"),
+            outstanding_amount=Decimal("500"),
+            status="SENT",
+            due_date=TODAY - timedelta(days=10),
+            reminder_count=0,
+        )
+        action, reason = determine_next_best_action(inv_10d, TODAY)
+        assert action == "send_polite_reminder"
+        assert "moderately overdue (10 days)" in reason
+        assert "newly overdue" not in reason
+
+        # Case 2: 3-day overdue invoice (newly overdue)
+        inv_3d = InvoiceInput(
+            invoice_id="INV-3D",
+            customer_name="Test",
+            total_amount=Decimal("500"),
+            outstanding_amount=Decimal("500"),
+            status="SENT",
+            due_date=TODAY - timedelta(days=3),
+            reminder_count=0,
+        )
+        action, reason = determine_next_best_action(inv_3d, TODAY)
+        assert action == "send_polite_reminder"
+        assert "newly overdue (3 days)" in reason
+
+        # Case 3: Overdue > 14 days, reminder_count == 0 (only mentions days overdue)
+        inv_20d = InvoiceInput(
+            invoice_id="INV-20D",
+            customer_name="Test",
+            total_amount=Decimal("500"),
+            outstanding_amount=Decimal("500"),
+            status="SENT",
+            due_date=TODAY - timedelta(days=20),
+            reminder_count=0,
+        )
+        action, reason = determine_next_best_action(inv_20d, TODAY)
+        assert action == "send_firm_followup"
+        assert "significantly overdue (20 days)" in reason
+        assert "prior reminders" not in reason
+
+        # Case 4: Overdue 5 days, reminder_count == 2 (only mentions reminder count)
+        inv_rem2 = InvoiceInput(
+            invoice_id="INV-REM2",
+            customer_name="Test",
+            total_amount=Decimal("500"),
+            outstanding_amount=Decimal("500"),
+            status="SENT",
+            due_date=TODAY - timedelta(days=5),
+            reminder_count=2,
+        )
+        action, reason = determine_next_best_action(inv_rem2, TODAY)
+        assert action == "send_firm_followup"
+        assert "prior polite reminders (2) yielded no payment" in reason.lower()
+        assert "significantly overdue" not in reason
+
+    def test_b4_default_reminder_tone_and_factual_firm_tone(self, client):
+        """B4: default tone derived from recommended action, user can override, firm tone is factual."""
+        set_ai_client(MockFailingGeminiClient())
+        try:
+            # INV-SEV-009 is 35 days overdue -> recommended action is send_firm_followup or manual_review
+            # Let's check reminder creation without specifying tone
+            res = client.post("/api/ai/invoices/INV-SEV-009/reminder", json={})
+            assert res.status_code == 200
+            draft = res.json()
+            # If recommended action is send_firm_followup -> tone is firm
+            # Or if manual_review -> tone is professional
+            assert draft["tone"] in ("firm", "professional")
+            
+            # Now override explicitly with friendly tone
+            res_override = client.post("/api/ai/invoices/INV-SEV-009/reminder", json={"tone": "friendly"})
+            assert res_override.status_code == 200
+            assert res_override.json()["tone"] == "friendly"
+
+            # Check firm tone content is strictly factual and non-threatening
+            res_firm = client.post("/api/ai/invoices/INV-SEV-009/reminder", json={"tone": "firm"})
+            assert res_firm.status_code == 200
+            body = res_firm.json()["body"]
+            assert "court" not in body.lower()
+            assert "lawsuit" not in body.lower()
+            assert "arrest" not in body.lower()
+            assert "ruin" not in body.lower()
+            assert "outstanding past its due date" in body or "remains outstanding" in body
+        finally:
+            set_ai_client(None)
+
+
+# =============================================================================
 # Live Smoke Test Check (Opt-in only via @pytest.mark.live_ai and RUN_LIVE_AI=1)
 # =============================================================================
 

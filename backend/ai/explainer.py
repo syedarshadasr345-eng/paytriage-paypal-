@@ -110,7 +110,7 @@ def generate_template_fallback_explanation(
     score = facts["priority_score"]
     priority = facts["priority_level"]
     action_name = facts["recommended_action"]
-    action_reason = facts["recommended_action_reason"]
+    action_reason = str(facts["recommended_action_reason"]).rstrip(".")
 
     summary = (
         f"Invoice {inv_num} for {amt} is {days} days overdue with priority score "
@@ -125,8 +125,6 @@ def generate_template_fallback_explanation(
         ]
 
     unavailable = list(facts["unavailable_fields"])
-    if not unavailable:
-        unavailable = ["All standard operational fields are populated."]
 
     caveats = [
         "Generated without AI — based strictly on deterministic recovery rules and database facts.",

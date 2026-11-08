@@ -147,3 +147,48 @@ class TestRecoveryInvoiceStrategiesEndpoint:
     def test_strategies_nonexistent_invoice_returns_404(self, client):
         res = client.get("/api/recovery/invoices/NON-EXISTENT-ID/strategies")
         assert res.status_code == 404
+
+
+class TestQueryDateValidation:
+    """Verifies that invalid 'today' query parameter returns a clean 422 Unprocessable Entity."""
+
+    def test_invalid_today_in_queue_returns_422(self, client):
+        res = client.get("/api/recovery/queue?today=invalid-date")
+        assert res.status_code == 422
+        errors = res.json()["detail"]
+        assert any("date" in str(e).lower() for e in errors)
+
+    def test_invalid_today_in_explain_returns_422(self, client):
+        res = client.post("/api/ai/invoices/INV-SEV-009/explain?today=not-a-date")
+        assert res.status_code == 422
+        errors = res.json()["detail"]
+        assert any("date" in str(e).lower() for e in errors)
+
+    def test_invalid_today_in_assistant_returns_422(self, client):
+        res = client.post("/api/ai/assistant?today=2026-99-99", json={"message": "Show overdue invoices"})
+        assert res.status_code == 422
+        errors = res.json()["detail"]
+        assert any("date" in str(e).lower() for e in errors)
+
+
+class TestCORSRestrictions:
+    """Verifies CORS restrictions: configurable origins allowed, no wildcard, unknown origins blocked."""
+
+    def test_allowed_origin_returns_cors_headers(self, client):
+        res = client.get("/api/health", headers={"Origin": "http://localhost:5173"})
+        assert res.status_code == 200
+        assert res.headers.get("access-control-allow-origin") == "http://localhost:5173"
+
+    def test_alternate_allowed_origin_returns_cors_headers(self, client):
+        res = client.get("/api/health", headers={"Origin": "http://127.0.0.1:5173"})
+        assert res.status_code == 200
+        assert res.headers.get("access-control-allow-origin") == "http://127.0.0.1:5173"
+
+    def test_disallowed_origin_rejected_without_allow_origin_header(self, client):
+        res = client.get("/api/health", headers={"Origin": "http://malicious-site.example.com"})
+        assert res.status_code == 200
+        assert "access-control-allow-origin" not in res.headers
+
+    def test_cors_never_returns_wildcard(self, client):
+        res = client.get("/api/health", headers={"Origin": "http://localhost:5173"})
+        assert res.headers.get("access-control-allow-origin") != "*"

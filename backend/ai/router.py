@@ -41,12 +41,12 @@ router = APIRouter(prefix="/api/ai", tags=["ai"])
 def explain_invoice_endpoint(
     id: str = Path(..., description="Invoice ID to explain"),
     req: Optional[ExplanationRequest] = None,
-    today: Optional[str] = Query(None, description="Optional ISO evaluation reference date"),
+    today: Optional[date] = Query(None, description="Optional ISO evaluation reference date"),
 ):
     """Generate grounded recovery explanation for an invoice with deterministic fallback."""
-    ref_date = date.fromisoformat(today) if today else None
+    question = req.question if req else None
     try:
-        return explain_invoice_recovery(invoice_id=id, today=ref_date)
+        return explain_invoice_recovery(invoice_id=id, today=today, question=question)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -116,12 +116,11 @@ def copy_reminder_endpoint(
 @router.post("/assistant", response_model=AssistantResponse)
 def assistant_endpoint(
     req: AssistantMessageRequest,
-    today: Optional[str] = Query(None, description="Optional ISO evaluation reference date"),
+    today: Optional[date] = Query(None, description="Optional ISO evaluation reference date"),
 ):
     """Interactive assistant supporting read-only triage tools and draft generation."""
-    ref_date = date.fromisoformat(today) if today else None
     return ask_assistant(
         query=req.message,
         conversation_id=req.conversation_id,
-        today=ref_date,
+        today=today,
     )

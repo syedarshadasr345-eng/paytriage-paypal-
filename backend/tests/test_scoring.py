@@ -490,3 +490,92 @@ class TestWorkedExamplesFromSpec:
         assert res.priority == "MEDIUM"
         assert res.recommended_action == "send_polite_reminder"
         assert "customer_payment_history" in res.unavailable_information
+
+
+class TestSeededInvoicesScoreRegression:
+    """Regression tests pinning the exact expected scores for all benchmark demo invoices."""
+
+    EXPECTED_SCORES = {
+        "INV-PAID-001": (None, None),
+        "INV-CANCELLED-002": (None, None),
+        "INV-DISPUTED-003": (None, None),
+        "INV-DRAFT-004": (None, None),
+        "INV-NOTDUE-005": (None, None),
+        "INV-NEW-006": (15, "LOW"),
+        "INV-MOD-007": (38, "MEDIUM"),
+        "INV-HIGH-008": (68, "HIGH"),
+        "INV-SEV-009": (92, "CRITICAL"),
+        "INV-REPEAT-010": (62, "HIGH"),
+        "INV-NOHIST-011": (43, "MEDIUM"),
+        "INV-PARTIAL-012": (54, "HIGH"),
+        "INV-BROKEN-013": (53, "HIGH"),
+        "INV-PROMISE-014": (44, "MEDIUM"),
+        "INV-COOLDOWN-015": (38, "MEDIUM"),
+        "INV-NONUSD-016": (26, "MEDIUM"),
+    }
+
+    def test_all_seeded_invoices_expected_scores(self):
+        """Pin scores and priorities for all 16 seed demo invoices evaluated at reference date TODAY."""
+        from backend.seed import get_seed_invoices
+        from backend.recovery.router import invoice_dict_to_input
+
+        seed_invoices = get_seed_invoices(base_date=TODAY)
+        assert len(seed_invoices) == 16, f"Expected 16 seed invoices, got {len(seed_invoices)}"
+
+        for raw_inv in seed_invoices:
+            inv_id = raw_inv["id"]
+            expected_score, expected_priority = self.EXPECTED_SCORES[inv_id]
+            inv_input = invoice_dict_to_input(raw_inv)
+            res = calculate_recovery_score(inv_input, today=TODAY)
+
+            assert res.score == expected_score, (
+                f"{inv_id}: expected score {expected_score}, got {res.score}. "
+                f"Factors: {[(f.factor_name, f.points) for f in res.contributing_factors]}"
+            )
+            assert res.priority == expected_priority, (
+                f"{inv_id}: expected priority {expected_priority}, got {res.priority}"
+            )
+
+    def test_inv_mod_007_exact_factor_breakdown(self):
+        """INV-MOD-007 breakdown: 20 (days) + 12 (amount) + 6 (1 reminder) + 0 (on_time history) = 38."""
+        from backend.seed import get_seed_invoices
+        from backend.recovery.router import invoice_dict_to_input
+
+        seed_map = {inv["id"]: inv for inv in get_seed_invoices(base_date=TODAY)}
+        inv_007 = invoice_dict_to_input(seed_map["INV-MOD-007"])
+        res = calculate_recovery_score(inv_007, today=TODAY)
+
+        factor_dict = {f.factor_name: f.points for f in res.contributing_factors}
+        assert factor_dict["moderately_overdue"] == 20
+        assert factor_dict["amount_medium"] == 12
+        assert factor_dict["single_unanswered_reminder"] == 6
+        assert factor_dict["customer_history_good"] == 0
+        assert res.score == 38
+        assert res.priority == "MEDIUM"
+
+    def test_reminder_grammar_singular_vs_plural(self):
+        """Action reason must say '1 prior follow-up' (singular) vs 'X prior follow-ups' (plural)."""
+        from backend.recovery.actions import determine_next_best_action
+
+        inv_1 = InvoiceInput(
+            invoice_id="INV-G1",
+            total_amount=Decimal("500"),
+            outstanding_amount=Decimal("500"),
+            status="SENT",
+            due_date=TODAY - timedelta(days=10),
+            reminder_count=1,
+        )
+        _, reason_1 = determine_next_best_action(inv_1, TODAY)
+        assert "1 prior follow-up." in reason_1
+        assert "1 prior follow-ups" not in reason_1
+
+        inv_2 = InvoiceInput(
+            invoice_id="INV-G2",
+            total_amount=Decimal("500"),
+            outstanding_amount=Decimal("500"),
+            status="SENT",
+            due_date=TODAY - timedelta(days=5),
+            reminder_count=0,
+        )
+        _, reason_2 = determine_next_best_action(inv_2, TODAY)
+        assert "0 prior follow-ups." in reason_2

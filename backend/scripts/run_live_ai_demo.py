@@ -44,6 +44,10 @@ def run():
         print(f"Result -> source: {exp_res.source}, fallback_reason: {exp_res.fallback_reason}")
 
         # 2. Reminder
+        print("\nWaiting 20 seconds between calls to observe quota rate bounds...")
+        import time
+        time.sleep(20)
+
         print(f"\n[REMINDER] Calling generate_or_regenerate_reminder({inv_id})...")
         rem_res = generate_or_regenerate_reminder(inv_id, client=real_client)
         rem_dict = rem_res.model_dump()
@@ -51,5 +55,9 @@ def run():
         print(json.dumps(rem_dict, indent=2, default=str))
         print(f"Result -> source: {rem_res.source}, fallback_reason: {rem_res.fallback_reason}")
 
+        print("\nWaiting 20 seconds before next invoice...")
+        time.sleep(20)
+
 if __name__ == "__main__":
     run()
+

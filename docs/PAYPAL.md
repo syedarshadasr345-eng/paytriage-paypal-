@@ -76,3 +76,4 @@ Live test run completed on 2026-11-08:
 - **Initial Status**: `DRAFT` ($250.00 USD)
 - **Sent Status**: `SENT` (payer-view URL generated: `https://www.sandbox.paypal.com/invoice/p/#INV2-7KYA-LFY4-CL67-Q5N6`)
 - **Verified State**: Database record synchronized with `is_demo=False`, `status="SENT"`, `outstanding_amount="250.00"`.
+

@@ -30,6 +30,7 @@ GEMINI_MODEL = os.getenv("GEMINI_MODEL", DEFAULT_GEMINI_MODEL)
 # Operational limits
 AI_TIMEOUT_SECONDS = float(os.getenv("AI_TIMEOUT_SECONDS", "30.0"))
 AI_MAX_RETRIES = int(os.getenv("AI_MAX_RETRIES", "1"))
+AI_FORCE_IPV4 = os.getenv("AI_FORCE_IPV4", "true").lower() in ("true", "1", "yes")
 
 logger = logging.getLogger("paytriage.ai")
 

@@ -17,6 +17,7 @@ from backend.ai.config import (
     GEMINI_MODEL,
     AI_TIMEOUT_SECONDS,
     AI_MAX_RETRIES,
+    AI_FORCE_IPV4,
     mask_secret,
     redact_sensitive_data,
 )
@@ -65,9 +66,19 @@ class GeminiClient:
             try:
                 from google import genai
                 from google.genai import types
-                # HttpOptions timeout is configured in milliseconds per official google-genai SDK docs
                 timeout_ms = int(AI_TIMEOUT_SECONDS * 1000)
-                http_options = types.HttpOptions(timeout=timeout_ms)
+                
+                # Check current google-genai SDK docs: types.HttpOptions supports custom httpx_client.
+                # Force IPv4 using local_address="0.0.0.0" if AI_FORCE_IPV4 is enabled.
+                http_client = None
+                if AI_FORCE_IPV4:
+                    transport = httpx.HTTPTransport(local_address="0.0.0.0")
+                    http_client = httpx.Client(transport=transport, timeout=AI_TIMEOUT_SECONDS)
+
+                http_options = types.HttpOptions(
+                    timeout=timeout_ms,
+                    httpx_client=http_client,
+                )
                 self._sdk_client = genai.Client(
                     api_key=self._api_key,
                     http_options=http_options,
@@ -92,7 +103,6 @@ class GeminiClient:
 
         from google.genai import types
 
-        # Per google.genai.types.HttpOptions docs: timeout is in milliseconds
         timeout_ms = int(AI_TIMEOUT_SECONDS * 1000)
         http_options = types.HttpOptions(timeout=timeout_ms)
 
@@ -111,12 +121,14 @@ class GeminiClient:
 
         config = types.GenerateContentConfig(**config_kwargs)
 
+        start_time = time.time()
+        max_attempts = min(3, max(1, AI_MAX_RETRIES + 2))
         last_error = None
-        for attempt in range(1, AI_MAX_RETRIES + 1):
+
+        for attempt in range(1, max_attempts + 1):
             try:
-                logger.info(f"Dispatching Gemini request (model={self.model}, attempt={attempt}/{AI_MAX_RETRIES}, timeout={AI_TIMEOUT_SECONDS}s)")
+                logger.info(f"Dispatching Gemini request (model={self.model}, attempt={attempt}/{max_attempts}, timeout={AI_TIMEOUT_SECONDS}s)")
                 
-                # Execute generation call
                 response = sdk_client.models.generate_content(
                     model=self.model,
                     contents=prompt,
@@ -146,12 +158,21 @@ class GeminiClient:
                     logger.error(f"Gemini request timed out after {AI_TIMEOUT_SECONDS}s: {clean_msg}")
                     raise AITimeoutError(f"Gemini request timed out after {AI_TIMEOUT_SECONDS}s: {clean_msg}")
 
-                if attempt < AI_MAX_RETRIES:
-                    time.sleep(0.5 * attempt)
+                # Retry ONLY for 503 (high demand) and 429 (quota/rate limit)
+                is_transient = "503" in clean_msg or "429" in clean_msg or "unavailable" in clean_msg.lower()
+                elapsed = time.time() - start_time
+                remaining_time = AI_TIMEOUT_SECONDS - elapsed
+
+                if is_transient and attempt < max_attempts and remaining_time > 2.0:
+                    backoff = min(1.5 * attempt, remaining_time - 0.5)
+                    logger.info(f"Transient error ({clean_msg[:60]}). Backing off {backoff:.1f}s before retry...")
+                    time.sleep(backoff)
+                else:
+                    break
 
         # All retries exhausted
         clean_err = redact_sensitive_data(str(last_error))
-        logger.error(f"Gemini request failed after {AI_MAX_RETRIES} attempts: {clean_err}")
+        logger.error(f"Gemini request failed: {clean_err}")
         raise AIClientError(f"Gemini generation failed: {clean_err}")
 
     def generate_json(

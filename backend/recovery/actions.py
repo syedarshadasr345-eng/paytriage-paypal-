@@ -97,8 +97,9 @@ def determine_next_best_action(invoice: InvoiceInput, today: date) -> Tuple[str,
 
     # 11. Polite Reminder (Default for 1–14 days overdue with 0–1 prior follow-ups)
     overdue_desc = "newly overdue" if days_overdue <= 7 else "moderately overdue"
+    followup_str = "1 prior follow-up" if invoice.reminder_count == 1 else f"{invoice.reminder_count} prior follow-ups"
     return (
         "send_polite_reminder",
-        f"Invoice is {overdue_desc} ({days_overdue} days) with {invoice.reminder_count} prior follow-ups. "
+        f"Invoice is {overdue_desc} ({days_overdue} days) with {followup_str}. "
         f"A polite payment reminder preserves the customer relationship while prompting settlement."
     )

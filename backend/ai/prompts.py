@@ -4,9 +4,8 @@ Strictly conforms to phase3.md (§Step 3) and RULES.md (§4, §6).
 Encapsulates untrusted invoice fields within strict XML-like delimiters.
 """
 
-from typing import Dict, Any, List, Optional
 import json
-
+from typing import Any
 
 EXPLAINER_SYSTEM_INSTRUCTION = """
 You are PayTriage AI, a specialized payment recovery intelligence explainer for business merchants.
@@ -52,7 +51,7 @@ CRITICAL RULES:
 """
 
 
-def build_explainer_prompt(facts: Dict[str, Any], question: Optional[str] = None) -> str:
+def build_explainer_prompt(facts: dict[str, Any], question: str | None = None) -> str:
     """Build grounded prompt for explanation generation, isolating untrusted fields."""
     untrusted_data = {
         "customer_name": facts.get("customer_name"),
@@ -118,7 +117,7 @@ Return JSON conforming strictly to:
 """
 
 
-def build_reminder_prompt(facts: Dict[str, Any], tone: str) -> str:
+def build_reminder_prompt(facts: dict[str, Any], tone: str) -> str:
     """Build grounded prompt for reminder draft generation."""
     untrusted_data = {
         "customer_name": facts.get("customer_name"),

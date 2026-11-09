@@ -5,20 +5,20 @@ Contains test cases covering all required boundary and operational states.
 """
 
 import sys
-from pathlib import Path
 from datetime import date, timedelta
 from decimal import Decimal
-from typing import List, Dict, Any
+from pathlib import Path
+from typing import Any
 
 # Ensure project root is in sys.path when running standalone
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from backend.database import init_db, clear_invoices, insert_invoice
+from backend.database import clear_invoices, init_db, insert_invoice, log_activity
 
 
-def get_seed_invoices(base_date: date) -> List[Dict[str, Any]]:
+def get_seed_invoices(base_date: date) -> list[dict[str, Any]]:
     """
     Generate the benchmark demo invoice records relative to base_date.
     Every record is explicitly tagged with is_demo=True and notes marked [DEMO DATA].
@@ -316,12 +316,25 @@ def get_seed_invoices(base_date: date) -> List[Dict[str, Any]]:
 
 
 def seed_database(base_date: date = date.today()) -> int:
-    """Populate SQLite database with benchmark demo records."""
+    """Populate SQLite database with benchmark demo records.
+    Also creates verified activity log entries so reminder_count can be
+    derived from verified executed reminders in activity_logs.
+    """
     init_db()
     clear_invoices()
     records = get_seed_invoices(base_date)
     for inv in records:
         insert_invoice(inv)
+        rem_count = int(inv.get("reminder_count", 0))
+        for r_idx in range(1, rem_count + 1):
+            rem_date = inv.get("last_reminder_date") or (base_date - timedelta(days=r_idx * 3))
+            log_activity(
+                invoice_id=inv["id"],
+                action_type="verified_reminder",
+                status="verified",
+                details=f"Verified historical reminder {r_idx} delivered on {rem_date}.",
+                log_id=f"ACT-SEED-{inv['id']}-{r_idx}",
+            )
     return len(records)
 
 

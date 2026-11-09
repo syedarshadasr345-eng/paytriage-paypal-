@@ -8,20 +8,18 @@ Features:
 - Sanitized errors hiding internal secrets.
 """
 
-import uuid
 import logging
-from typing import Optional, Dict, Any
+from typing import Any
+
 import httpx
 
-from backend.paypal.config import (
-    PAYPAL_API_BASE,
-    PAYPAL_TIMEOUT_SECONDS,
-    PAYPAL_MAX_RETRIES,
-)
 from backend.paypal.auth import (
     get_auth_manager,
-    PayPalAuthError,
-    PayPalNotConfiguredError,
+)
+from backend.paypal.config import (
+    PAYPAL_API_BASE,
+    PAYPAL_MAX_RETRIES,
+    PAYPAL_TIMEOUT_SECONDS,
 )
 
 logger = logging.getLogger("paytriage.paypal.client")
@@ -29,12 +27,11 @@ logger = logging.getLogger("paytriage.paypal.client")
 
 class PayPalClientError(Exception):
     """Base exception for PayPal client failures."""
-    pass
 
 
 class PayPalApiError(PayPalClientError):
     """Raised when PayPal returns a non-2xx status code."""
-    def __init__(self, message: str, status_code: int, error_name: Optional[str] = None, details: Optional[Any] = None):
+    def __init__(self, message: str, status_code: int, error_name: str | None = None, details: Any | None = None):
         super().__init__(message)
         self.status_code = status_code
         self.error_name = error_name
@@ -43,33 +40,28 @@ class PayPalApiError(PayPalClientError):
 
 class PayPalNotFoundError(PayPalApiError):
     """Raised when an invoice or resource does not exist (HTTP 404)."""
-    pass
 
 
 class PayPalRateLimitError(PayPalApiError):
     """Raised when PayPal rate limits requests (HTTP 429)."""
-    pass
 
 
 class PayPalTimeoutError(PayPalClientError):
     """Raised when request to PayPal exceeds timeout."""
-    pass
 
 
 class PayPalNetworkError(PayPalClientError):
     """Raised when network transport fails."""
-    pass
 
 
 class PayPalDuplicateRequestError(PayPalClientError):
     """Raised by local duplicate guard when identical operation is submitted concurrently."""
-    pass
 
 
 class PayPalClient:
     """HTTP Client for PayPal REST Invoicing V2 API."""
 
-    def __init__(self, http_client: Optional[httpx.Client] = None):
+    def __init__(self, http_client: httpx.Client | None = None):
         self._http = http_client or httpx.Client(timeout=PAYPAL_TIMEOUT_SECONDS)
         self._processed_request_ids = set()
 
@@ -77,10 +69,10 @@ class PayPalClient:
         self,
         method: str,
         path: str,
-        json_data: Optional[Dict[str, Any]] = None,
-        params: Optional[Dict[str, Any]] = None,
-        request_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        json_data: dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
+        request_id: str | None = None,
+    ) -> dict[str, Any]:
         """Execute authenticated request against PayPal API with idempotency and retry guards."""
         # Local duplicate guard on POST/PUT requests
         if method.upper() in ("POST", "PUT") and request_id:
@@ -130,7 +122,7 @@ class PayPalClient:
 
         raise PayPalApiError("Max authentication retries exhausted.", status_code=401)
 
-    def _handle_response(self, resp: httpx.Response, request_id: Optional[str] = None) -> Dict[str, Any]:
+    def _handle_response(self, resp: httpx.Response, request_id: str | None = None) -> dict[str, Any]:
         """Parse response payload, map HTTP errors, and record idempotency."""
         code = resp.status_code
 

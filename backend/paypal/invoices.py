@@ -9,28 +9,29 @@ Operations:
 - Step 6: Payment verification and audit logging
 """
 
-import uuid
 import logging
+import uuid
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Dict, Any, Optional
+from typing import Any
 
 from backend.database import (
-    insert_invoice,
     get_invoice_by_id,
+    insert_invoice,
     log_activity,
 )
-from backend.paypal.client import PayPalClient
+from backend.paypal.client import PayPalApiError, PayPalClient
 from backend.paypal.schemas import (
-    PayPalInvoiceResponse,
     CreateInvoicePayload,
     InvoiceDetailInput,
-    RecipientInfo,
-    RecipientBillingInfo,
-    ParticipantName,
     InvoiceLineItem,
+    InvoicePaymentTerm,
     MoneyAmount,
+    ParticipantName,
+    PayPalInvoiceResponse,
     PayPalSyncResult,
+    RecipientBillingInfo,
+    RecipientInfo,
 )
 
 logger = logging.getLogger("paytriage.paypal.invoices")
@@ -38,8 +39,8 @@ logger = logging.getLogger("paytriage.paypal.invoices")
 
 def map_paypal_status_to_app(
     paypal_status: str,
-    due_date: Optional[date] = None,
-    today: Optional[date] = None,
+    due_date: date | None = None,
+    today: date | None = None,
 ) -> str:
     """Map official PayPal Invoicing V2 statuses to PayTriage internal statuses.
     
@@ -89,9 +90,9 @@ def map_paypal_status_to_app(
 
 
 def create_sandbox_invoice(
-    invoice_data: Dict[str, Any],
-    request_id: Optional[str] = None,
-    client: Optional[PayPalClient] = None,
+    invoice_data: dict[str, Any],
+    request_id: str | None = None,
+    client: PayPalClient | None = None,
 ) -> PayPalInvoiceResponse:
     """Create a draft invoice in PayPal Sandbox per official v2 schema.
     Endpoint: POST /v2/invoicing/invoices
@@ -112,6 +113,7 @@ def create_sandbox_invoice(
             invoice_date=inv_date,
             currency_code=currency,
             note=invoice_data.get("notes"),
+            payment_term=InvoicePaymentTerm(due_date=due_date) if due_date else None,
         ),
         primary_recipients=[
             RecipientInfo(
@@ -165,7 +167,7 @@ def create_sandbox_invoice(
 
 def get_sandbox_invoice(
     invoice_id: str,
-    client: Optional[PayPalClient] = None,
+    client: PayPalClient | None = None,
 ) -> PayPalInvoiceResponse:
     """Retrieve full details of an invoice from PayPal Sandbox.
     Endpoint: GET /v2/invoicing/invoices/{invoice_id}
@@ -180,8 +182,8 @@ def get_sandbox_invoice(
 
 def sync_paypal_invoice(
     invoice_id: str,
-    today: Optional[date] = None,
-    client: Optional[PayPalClient] = None,
+    today: date | None = None,
+    client: PayPalClient | None = None,
 ) -> PayPalSyncResult:
     """Synchronize an invoice from PayPal Sandbox into the PayTriage SQLite database.
     Strictly adheres to RULES.md §4: Never marks paid without PayPal evidence.
@@ -214,7 +216,7 @@ def sync_paypal_invoice(
         evidence_source = f"paypal_status:{paypal_status}"
     elif live_inv.payments and live_inv.payments.paid_amount and live_inv.payments.paid_amount.value:
         paid_val = Decimal(str(live_inv.payments.paid_amount.value))
-        if paid_val >= total_val and total_val > 0:
+        if paid_val >= total_val > 0:
             is_paid = True
             evidence_source = "paypal_payments_summary"
             due_val = Decimal("0.00")
@@ -291,9 +293,9 @@ def sync_paypal_invoice(
 def send_sandbox_invoice(
     invoice_id: str,
     send_to_recipient: bool = True,
-    request_id: Optional[str] = None,
-    client: Optional[PayPalClient] = None,
-) -> Dict[str, Any]:
+    request_id: str | None = None,
+    client: PayPalClient | None = None,
+) -> dict[str, Any]:
     """Execute supported invoice operation: Send invoice to recipient via PayPal.
     Endpoint: POST /v2/invoicing/invoices/{invoice_id}/send
     """
@@ -320,22 +322,26 @@ def send_sandbox_invoice(
 
 def remind_sandbox_invoice(
     invoice_id: str,
-    note: Optional[str] = None,
+    subject: str | None = None,
+    note: str | None = None,
     send_to_recipient: bool = True,
-    request_id: Optional[str] = None,
-    client: Optional[PayPalClient] = None,
-) -> Dict[str, Any]:
+    request_id: str | None = None,
+    client: PayPalClient | None = None,
+) -> dict[str, Any]:
     """Execute supported invoice operation: Send payment reminder to payer.
     Endpoint: POST /v2/invoicing/invoices/{invoice_id}/remind
-    Note per official docs: Maximum 2 reminders per day allowed by PayPal.
+    Official PayPal Reference: https://developer.paypal.com/docs/api/invoicing/v2/#invoices_remind
+    Supports subject and note. Maximum 2 reminders per day allowed by PayPal.
     """
     http_client = client or PayPalClient()
     req_id = request_id or str(uuid.uuid4())
 
-    body = {
+    body: dict[str, Any] = {
         "send_to_recipient": send_to_recipient,
         "send_to_invoicer": False,
     }
+    if subject and str(subject).strip():
+        body["subject"] = str(subject).strip()
     if note and str(note).strip():
         body["note"] = str(note).strip()
 
@@ -357,8 +363,8 @@ def remind_sandbox_invoice(
 
 def verify_sandbox_invoice_payment(
     invoice_id: str,
-    client: Optional[PayPalClient] = None,
-) -> Dict[str, Any]:
+    client: PayPalClient | None = None,
+) -> dict[str, Any]:
     """Re-fetch invoice from PayPal after an operation and record verified state.
     Strictly conforms to phase4.md Step 6.
     """

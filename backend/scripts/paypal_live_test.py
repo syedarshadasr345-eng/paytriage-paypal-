@@ -9,8 +9,8 @@ Tests steps 3b through 3g live against PayPal Sandbox API:
 3g. Re-fetch and record verified state.
 """
 
-import sys
 import json
+import sys
 import time
 from datetime import date, timedelta
 from pathlib import Path
@@ -18,18 +18,22 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from backend.paypal.config import is_paypal_configured, mask_credential, get_paypal_client_id
+from backend.database import get_invoice_by_id
+from backend.paypal.client import PayPalApiError
+from backend.paypal.config import (
+    get_paypal_client_id,
+    is_paypal_configured,
+    mask_credential,
+)
 from backend.paypal.invoices import (
     create_sandbox_invoice,
     get_sandbox_invoice,
     map_paypal_status_to_app,
-    sync_paypal_invoice,
-    send_sandbox_invoice,
     remind_sandbox_invoice,
+    send_sandbox_invoice,
+    sync_paypal_invoice,
     verify_sandbox_invoice_payment,
 )
-from backend.paypal.client import PayPalApiError, PayPalClientError
-from backend.database import get_invoice_by_id, get_all_invoices
 
 
 def run_live_test():

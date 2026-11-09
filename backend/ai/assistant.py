@@ -8,30 +8,25 @@ Enforces:
 """
 
 import re
-from datetime import date, datetime
-from decimal import Decimal
-from typing import Dict, Any, List, Optional, Callable, Tuple
+from datetime import date
+from typing import Any
 
+from backend.ai.client import AIClientError, get_ai_client
+from backend.ai.explainer import invoice_to_input
+from backend.ai.prompts import ASSISTANT_SYSTEM_INSTRUCTION
+from backend.ai.reminders import generate_or_regenerate_reminder
+from backend.ai.schemas import AssistantResponse
 from backend.database import (
     get_all_invoices,
     get_invoice_by_id,
-    list_reminder_drafts,
 )
-from backend.recovery.models import InvoiceInput
 from backend.recovery.scoring import calculate_recovery_score
-from backend.recovery.actions import determine_next_best_action
-from backend.ai.schemas import AssistantResponse
-from backend.ai.reminders import generate_or_regenerate_reminder
-from backend.ai.explainer import invoice_to_input
-from backend.ai.client import get_ai_client, AIClientError
-from backend.ai.prompts import ASSISTANT_SYSTEM_INSTRUCTION
-
 
 # -----------------------------------------------------------------------------
 # Fixed Backend Tools (Read-Only or Draft-Only)
 # -----------------------------------------------------------------------------
 
-def tool_list_overdue_invoices(limit: int = 10, today: Optional[date] = None) -> List[Dict[str, Any]]:
+def tool_list_overdue_invoices(limit: int = 10, today: date | None = None) -> list[dict[str, Any]]:
     """List overdue invoices sorted by recovery priority score descending."""
     eval_date = today or date.today()
     all_invs = get_all_invoices()
@@ -57,7 +52,7 @@ def tool_list_overdue_invoices(limit: int = 10, today: Optional[date] = None) ->
     return overdue[:limit]
 
 
-def tool_get_invoice(invoice_id: str) -> Optional[Dict[str, Any]]:
+def tool_get_invoice(invoice_id: str) -> dict[str, Any] | None:
     """Retrieve full verified details of a specific invoice."""
     inv = get_invoice_by_id(invoice_id)
     if not inv:
@@ -79,7 +74,7 @@ def tool_get_invoice(invoice_id: str) -> Optional[Dict[str, Any]]:
     }
 
 
-def tool_explain_score(invoice_id: str, today: Optional[date] = None) -> Dict[str, Any]:
+def tool_explain_score(invoice_id: str, today: date | None = None) -> dict[str, Any]:
     """Retrieve the deterministic score breakdown and next-best-action for an invoice."""
     inv = get_invoice_by_id(invoice_id)
     if not inv:
@@ -99,7 +94,7 @@ def tool_explain_score(invoice_id: str, today: Optional[date] = None) -> Dict[st
     }
 
 
-def tool_list_pending_actions(today: Optional[date] = None) -> List[Dict[str, Any]]:
+def tool_list_pending_actions(today: date | None = None) -> list[dict[str, Any]]:
     """List pending recovery recommendations requiring merchant review."""
     eval_date = today or date.today()
     all_invs = get_all_invoices()
@@ -122,7 +117,7 @@ def tool_list_pending_actions(today: Optional[date] = None) -> List[Dict[str, An
     return pending
 
 
-def tool_draft_reminder(invoice_id: str, tone: str = "polite") -> Dict[str, Any]:
+def tool_draft_reminder(invoice_id: str, tone: str = "polite") -> dict[str, Any]:
     """Create a draft reminder for an invoice (draft state only, never sent)."""
     if tone not in ("professional", "friendly", "polite", "firm"):
         tone = "polite"
@@ -146,13 +141,13 @@ AVAILABLE_TOOLS = {
 }
 
 
-def extract_referenced_invoices(text: str) -> List[str]:
+def extract_referenced_invoices(text: str) -> list[str]:
     """Extract all invoice references matching standard ID formats."""
     # Look for INV-*** patterns
     return list(set(re.findall(r"\bINV-[A-Za-z0-9_-]+\b", text)))
 
 
-def validate_assistant_invoices(text: str) -> Tuple[bool, List[str]]:
+def validate_assistant_invoices(text: str) -> tuple[bool, list[str]]:
     """Validate that every invoice ID mentioned in the text actually exists in the database.
     If an unknown invoice ID is referenced, return (False, unknown_ids).
     """
@@ -169,7 +164,7 @@ def validate_assistant_invoices(text: str) -> Tuple[bool, List[str]]:
 
 def run_deterministic_assistant_fallback(
     query: str,
-    today: Optional[date] = None,
+    today: date | None = None,
 ) -> AssistantResponse:
     """Deterministic, tool-driven assistant logic for queries without AI or when AI fails.
     Accurately handles all 5 canonical Phase 3 benchmark queries.
@@ -198,7 +193,7 @@ def run_deterministic_assistant_fallback(
         if not overdue:
             reply = "There are currently no overdue invoices requiring recovery follow-up."
         else:
-            lines = [f"Here are the top overdue invoices prioritized by recovery urgency:"]
+            lines = ["Here are the top overdue invoices prioritized by recovery urgency:"]
             for o in overdue:
                 referenced_invoices.append(o["id"])
                 lines.append(
@@ -303,8 +298,8 @@ def run_deterministic_assistant_fallback(
 
 def ask_assistant(
     query: str,
-    conversation_id: Optional[str] = None,
-    today: Optional[date] = None,
+    conversation_id: str | None = None,
+    today: date | None = None,
     client=None,
 ) -> AssistantResponse:
     """Main assistant query handler.

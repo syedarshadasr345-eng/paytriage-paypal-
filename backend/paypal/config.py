@@ -4,10 +4,10 @@ Strictly conforms to phase4.md and RULES.md (§8, §9).
 Reads PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET, and PAYPAL_API_BASE from backend/.env or system environment.
 """
 
-import os
 import logging
+import os
 from pathlib import Path
-from typing import Optional
+
 from dotenv import load_dotenv
 
 # Search and load backend/.env first, then root .env
@@ -45,7 +45,7 @@ PAYPAL_TIMEOUT_SECONDS = float(os.getenv("PAYPAL_TIMEOUT_SECONDS", "15.0"))
 PAYPAL_MAX_RETRIES = int(os.getenv("PAYPAL_MAX_RETRIES", "1"))
 
 
-def get_paypal_client_id() -> Optional[str]:
+def get_paypal_client_id() -> str | None:
     """Retrieve PayPal Sandbox Client ID. Returns None if unconfigured or placeholder."""
     cid = os.getenv("PAYPAL_CLIENT_ID")
     if cid and cid.strip() and not cid.startswith("your_"):
@@ -53,7 +53,7 @@ def get_paypal_client_id() -> Optional[str]:
     return None
 
 
-def get_paypal_client_secret() -> Optional[str]:
+def get_paypal_client_secret() -> str | None:
     """Retrieve PayPal Sandbox Client Secret. Returns None if unconfigured or placeholder."""
     secret = os.getenv("PAYPAL_CLIENT_SECRET")
     if secret and secret.strip() and not secret.startswith("your_"):
@@ -68,7 +68,7 @@ def is_paypal_configured() -> bool:
     return bool(cid and sec)
 
 
-def mask_credential(val: Optional[str]) -> str:
+def mask_credential(val: str | None) -> str:
     """Mask credential for safe logging and telemetry."""
     if not val:
         return "[NOT_SET]"

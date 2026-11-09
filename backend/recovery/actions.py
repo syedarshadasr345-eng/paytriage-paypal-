@@ -1,12 +1,16 @@
 from datetime import date
-from typing import Tuple
-from backend.recovery.config import REMINDER_COOLDOWN_DAYS, SEVERE_DELINQUENCY_DAYS, MAX_FOLLOWUPS_BEFORE_MANUAL_REVIEW
+
+from backend.recovery.config import (
+    MAX_FOLLOWUPS_BEFORE_MANUAL_REVIEW,
+    REMINDER_COOLDOWN_DAYS,
+    SEVERE_DELINQUENCY_DAYS,
+)
 from backend.recovery.models import InvoiceInput
 
 RECOGNIZED_STATUSES = {"DRAFT", "SENT", "OVERDUE", "PARTIALLY_PAID", "PAID", "CANCELLED", "DISPUTED"}
 
 
-def determine_next_best_action(invoice: InvoiceInput, today: date) -> Tuple[str, str]:
+def determine_next_best_action(invoice: InvoiceInput, today: date) -> tuple[str, str]:
     """
     Deterministically computes the next-best recovery action and its visible reason.
     Evaluates strictly against the supplied 'today' date.

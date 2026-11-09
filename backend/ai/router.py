@@ -12,27 +12,27 @@ Endpoints:
 """
 
 from datetime import date
-from typing import Optional, List
-from fastapi import APIRouter, HTTPException, Query, Path
 
-from backend.ai.schemas import (
-    ExplanationResponse,
-    ExplanationRequest,
-    ReminderCreateRequest,
-    ReminderEditRequest,
-    ReminderDraftResponse,
-    ReminderCopyResponse,
-    AssistantMessageRequest,
-    AssistantResponse,
-)
+from fastapi import APIRouter, HTTPException, Path, Query
+
+from backend.ai.assistant import ask_assistant
 from backend.ai.explainer import explain_invoice_recovery
 from backend.ai.reminders import (
-    generate_or_regenerate_reminder,
-    edit_reminder_draft,
     copy_reminder_draft,
+    edit_reminder_draft,
+    generate_or_regenerate_reminder,
 )
-from backend.ai.assistant import ask_assistant
-from backend.database import get_reminder_draft, list_reminder_drafts, get_invoice_by_id
+from backend.ai.schemas import (
+    AssistantMessageRequest,
+    AssistantResponse,
+    ExplanationRequest,
+    ExplanationResponse,
+    ReminderCopyResponse,
+    ReminderCreateRequest,
+    ReminderDraftResponse,
+    ReminderEditRequest,
+)
+from backend.database import get_invoice_by_id, get_reminder_draft, list_reminder_drafts
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
@@ -40,8 +40,8 @@ router = APIRouter(prefix="/api/ai", tags=["ai"])
 @router.post("/invoices/{id}/explain", response_model=ExplanationResponse)
 def explain_invoice_endpoint(
     id: str = Path(..., description="Invoice ID to explain"),
-    req: Optional[ExplanationRequest] = None,
-    today: Optional[date] = Query(None, description="Optional ISO evaluation reference date"),
+    req: ExplanationRequest | None = None,
+    today: date | None = Query(None, description="Optional ISO evaluation reference date"),
 ):
     """Generate grounded recovery explanation for an invoice with deterministic fallback."""
     question = req.question if req else None
@@ -50,13 +50,13 @@ def explain_invoice_endpoint(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Explanation generation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Explanation generation failed: {e!s}")
 
 
 @router.post("/invoices/{id}/reminder", response_model=ReminderDraftResponse)
 def generate_reminder_endpoint(
     id: str = Path(..., description="Invoice ID to draft reminder for"),
-    req: Optional[ReminderCreateRequest] = None,
+    req: ReminderCreateRequest | None = None,
 ):
     """Generate or regenerate a payment reminder draft (draft status only, never sent)."""
     tone = req.tone if req else None
@@ -65,10 +65,10 @@ def generate_reminder_endpoint(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Reminder generation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Reminder generation failed: {e!s}")
 
 
-@router.get("/invoices/{id}/reminders", response_model=List[ReminderDraftResponse])
+@router.get("/invoices/{id}/reminders", response_model=list[ReminderDraftResponse])
 def list_invoice_reminders_endpoint(
     id: str = Path(..., description="Invoice ID"),
 ):
@@ -117,7 +117,7 @@ def copy_reminder_endpoint(
 @router.post("/assistant", response_model=AssistantResponse)
 def assistant_endpoint(
     req: AssistantMessageRequest,
-    today: Optional[date] = Query(None, description="Optional ISO evaluation reference date"),
+    today: date | None = Query(None, description="Optional ISO evaluation reference date"),
 ):
     """Interactive assistant supporting read-only triage tools and draft generation."""
     return ask_assistant(

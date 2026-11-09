@@ -4,10 +4,10 @@ Strictly conforms to phase4.md and RULES.md (§8, §9).
 Resilient schema design: unknown or unexpected fields from PayPal do not crash the app.
 """
 
-from typing import List, Optional, Dict, Any, Literal
 from decimal import Decimal
-from pydantic import BaseModel, Field, ConfigDict
+from typing import Any, Literal
 
+from pydantic import BaseModel, ConfigDict, Field
 
 # -----------------------------------------------------------------------------
 # OAuth Schemas
@@ -20,9 +20,9 @@ class PayPalOAuthToken(BaseModel):
     access_token: str
     token_type: str = "Bearer"
     expires_in: int = 32400
-    scope: Optional[str] = None
-    app_id: Optional[str] = None
-    nonce: Optional[str] = None
+    scope: str | None = None
+    app_id: str | None = None
+    nonce: str | None = None
 
 
 class PayPalStatusResponse(BaseModel):
@@ -50,7 +50,7 @@ class MoneyAmount(BaseModel):
 class InvoicePaymentTerm(BaseModel):
     model_config = ConfigDict(extra="allow")
     term_type: str = "DUE_ON_DATE"
-    due_date: Optional[str] = None
+    due_date: str | None = None
 
 
 class InvoiceDetailInput(BaseModel):
@@ -58,27 +58,27 @@ class InvoiceDetailInput(BaseModel):
     invoice_number: str
     invoice_date: str
     currency_code: str = "USD"
-    note: Optional[str] = None
-    terms_and_conditions: Optional[str] = None
-    payment_term: Optional[InvoicePaymentTerm] = None
+    note: str | None = None
+    terms_and_conditions: str | None = None
+    payment_term: InvoicePaymentTerm | None = None
 
 
 class ParticipantName(BaseModel):
     model_config = ConfigDict(extra="allow")
-    given_name: Optional[str] = None
-    surname: Optional[str] = None
-    business_name: Optional[str] = None
+    given_name: str | None = None
+    surname: str | None = None
+    business_name: str | None = None
 
 
 class InvoicerInfo(BaseModel):
     model_config = ConfigDict(extra="allow")
-    name: Optional[ParticipantName] = None
+    name: ParticipantName | None = None
     email_address: str
 
 
 class RecipientBillingInfo(BaseModel):
     model_config = ConfigDict(extra="allow")
-    name: Optional[ParticipantName] = None
+    name: ParticipantName | None = None
     email_address: str
 
 
@@ -90,7 +90,7 @@ class RecipientInfo(BaseModel):
 class InvoiceLineItem(BaseModel):
     model_config = ConfigDict(extra="allow")
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     quantity: str = "1"
     unit_amount: MoneyAmount
 
@@ -100,9 +100,9 @@ class CreateInvoicePayload(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     detail: InvoiceDetailInput
-    invoicer: Optional[InvoicerInfo] = None
-    primary_recipients: List[RecipientInfo]
-    items: List[InvoiceLineItem]
+    invoicer: InvoicerInfo | None = None
+    primary_recipients: list[RecipientInfo]
+    items: list[InvoiceLineItem]
 
 
 # -----------------------------------------------------------------------------
@@ -111,40 +111,40 @@ class CreateInvoicePayload(BaseModel):
 
 class PayPalInvoiceDetailResponse(BaseModel):
     model_config = ConfigDict(extra="allow")
-    id: Optional[str] = None
-    invoice_number: Optional[str] = None
-    invoice_date: Optional[str] = None
-    currency_code: Optional[str] = None
-    payment_term: Optional[Dict[str, Any]] = None
-    metadata: Optional[Dict[str, Any]] = None
+    id: str | None = None
+    invoice_number: str | None = None
+    invoice_date: str | None = None
+    currency_code: str | None = None
+    payment_term: dict[str, Any] | None = None
+    metadata: dict[str, Any] | None = None
 
 
 class PayPalAmountBreakdown(BaseModel):
     model_config = ConfigDict(extra="allow")
-    currency_code: Optional[str] = None
-    value: Optional[str] = None
+    currency_code: str | None = None
+    value: str | None = None
 
 
 class PayPalInvoiceAmount(BaseModel):
     model_config = ConfigDict(extra="allow")
-    currency_code: Optional[str] = None
-    value: Optional[str] = None
-    breakdown: Optional[Dict[str, Any]] = None
+    currency_code: str | None = None
+    value: str | None = None
+    breakdown: dict[str, Any] | None = None
 
 
 class PayPalPaymentDetail(BaseModel):
     model_config = ConfigDict(extra="allow")
-    paid_amount: Optional[PayPalAmountBreakdown] = None
-    payment_date: Optional[str] = None
-    method: Optional[str] = None
-    type: Optional[str] = None
-    note: Optional[str] = None
+    paid_amount: PayPalAmountBreakdown | None = None
+    payment_date: str | None = None
+    method: str | None = None
+    type: str | None = None
+    note: str | None = None
 
 
 class PayPalPaymentsSummary(BaseModel):
     model_config = ConfigDict(extra="allow")
-    paid_amount: Optional[PayPalAmountBreakdown] = None
-    transactions: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
+    paid_amount: PayPalAmountBreakdown | None = None
+    transactions: list[dict[str, Any]] | None = Field(default_factory=list)
 
 
 class PayPalInvoiceResponse(BaseModel):
@@ -153,14 +153,14 @@ class PayPalInvoiceResponse(BaseModel):
 
     id: str
     status: str
-    detail: Optional[PayPalInvoiceDetailResponse] = None
-    invoicer: Optional[Dict[str, Any]] = None
-    primary_recipients: Optional[List[Dict[str, Any]]] = None
-    items: Optional[List[Dict[str, Any]]] = None
-    amount: Optional[PayPalInvoiceAmount] = None
-    due_amount: Optional[PayPalAmountBreakdown] = None
-    payments: Optional[PayPalPaymentsSummary] = None
-    links: Optional[List[Dict[str, Any]]] = None
+    detail: PayPalInvoiceDetailResponse | None = None
+    invoicer: dict[str, Any] | None = None
+    primary_recipients: list[dict[str, Any]] | None = None
+    items: list[dict[str, Any]] | None = None
+    amount: PayPalInvoiceAmount | None = None
+    due_amount: PayPalAmountBreakdown | None = None
+    payments: PayPalPaymentsSummary | None = None
+    links: list[dict[str, Any]] | None = None
 
 
 class PayPalSyncResult(BaseModel):

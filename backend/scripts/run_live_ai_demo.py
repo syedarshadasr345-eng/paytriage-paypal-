@@ -4,20 +4,20 @@ Invokes explain and reminder for 3 demo invoices with real GEMINI_API_KEY.
 Outputs raw JSON with secrets hidden, reports source and fallback_reason.
 """
 
-import os
-import sys
 import json
+import sys
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from backend.ai.config import get_gemini_api_key, GEMINI_MODEL
+from datetime import date
+
 from backend.ai.client import GeminiClient
+from backend.ai.config import GEMINI_MODEL, get_gemini_api_key
 from backend.ai.explainer import explain_invoice_recovery
 from backend.ai.reminders import generate_or_regenerate_reminder
 from backend.seed import seed_database
-from datetime import date
 
 DEMO_INVOICES = ["INV-MOD-007", "INV-HIGH-008", "INV-SEV-009"]
 TODAY = date(2026, 11, 1)

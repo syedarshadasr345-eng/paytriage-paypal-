@@ -8,36 +8,33 @@ Enforces:
 """
 
 import uuid
-import re
 from datetime import datetime
 from decimal import Decimal
-from typing import Dict, Any, Optional, Tuple
+from typing import Any
 
-from backend.database import (
-    get_invoice_by_id,
-    save_reminder_draft,
-    get_reminder_draft,
-    update_reminder_draft,
-    list_reminder_drafts,
-    log_activity,
-)
-from backend.ai.schemas import (
-    ReminderTone,
-    ReminderDraftResponse,
-    ReminderCopyResponse,
-    ReminderEditRequest,
-)
-from backend.ai.prompts import REMINDER_SYSTEM_INSTRUCTION, build_reminder_prompt
 from backend.ai.client import (
-    get_ai_client,
-    AIClientError,
+    AIProviderUnavailableError,
     AISchemaValidationError,
     AITimeoutError,
-    AIProviderUnavailableError,
+    get_ai_client,
+)
+from backend.ai.prompts import REMINDER_SYSTEM_INSTRUCTION, build_reminder_prompt
+from backend.ai.schemas import (
+    ReminderCopyResponse,
+    ReminderDraftResponse,
+    ReminderEditRequest,
+    ReminderTone,
+)
+from backend.database import (
+    get_invoice_by_id,
+    get_reminder_draft,
+    log_activity,
+    save_reminder_draft,
+    update_reminder_draft,
 )
 
 
-def get_deterministic_template(facts: Dict[str, Any], tone: ReminderTone) -> Tuple[str, str]:
+def get_deterministic_template(facts: dict[str, Any], tone: ReminderTone) -> tuple[str, str]:
     """Generate rule-based deterministic reminder template for given tone.
     Guarantees correct invoice reference, amount, and due date.
     """
@@ -88,7 +85,7 @@ def get_deterministic_template(facts: Dict[str, Any], tone: ReminderTone) -> Tup
     return subject, body
 
 
-def validate_reminder_text(subject: str, body: str, facts: Dict[str, Any]) -> bool:
+def validate_reminder_text(subject: str, body: str, facts: dict[str, Any]) -> bool:
     """Validate that generated reminder contains required ground-truth elements:
     1. Invoice reference (invoice_number or id)
     2. Outstanding amount
@@ -124,7 +121,7 @@ def validate_reminder_text(subject: str, body: str, facts: Dict[str, Any]) -> bo
 
 def generate_or_regenerate_reminder(
     invoice_id: str,
-    tone: Optional[ReminderTone] = None,
+    tone: ReminderTone | None = None,
     client=None,
 ) -> ReminderDraftResponse:
     """Generate or regenerate a reminder draft.
@@ -167,9 +164,9 @@ def generate_or_regenerate_reminder(
 
     ai_client = client or get_ai_client()
     chosen_source = "ai"
-    fallback_reason: Optional[str] = None
-    subject: Optional[str] = None
-    body: Optional[str] = None
+    fallback_reason: str | None = None
+    subject: str | None = None
+    body: str | None = None
 
     try:
         prompt = build_reminder_prompt(facts, tone=resolved_tone)

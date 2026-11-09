@@ -6,17 +6,16 @@ Applies minimal thinking budget (0) and max_output_tokens=1024 for gemini-3.8-fl
 NEVER prints or leaks API keys.
 """
 
-import os
+import socket
 import sys
 import time
-import socket
 from pathlib import Path
 
 # Add project root to path
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from backend.ai.config import get_gemini_api_key, GEMINI_MODEL
+from backend.ai.config import GEMINI_MODEL, get_gemini_api_key
 
 
 def ping_gemini(force_ipv4: bool = False, model_name: str = GEMINI_MODEL) -> dict:

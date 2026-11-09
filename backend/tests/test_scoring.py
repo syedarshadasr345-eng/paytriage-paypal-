@@ -1,14 +1,15 @@
 from datetime import date, timedelta
 from decimal import Decimal
+
 import pytest
 from pydantic import ValidationError
 
-from backend.recovery.models import InvoiceInput, InvoiceScoreResponse, StrategyEvaluation
-from backend.recovery.scoring import calculate_recovery_score
 from backend.recovery.actions import determine_next_best_action
-from backend.recovery.strategies import evaluate_strategies
-from backend.recovery.config import SCORING_VERSION, REMINDER_COOLDOWN_DAYS
-
+from backend.recovery.config import SCORING_VERSION
+from backend.recovery.models import (
+    InvoiceInput,
+)
+from backend.recovery.scoring import calculate_recovery_score
 
 # Fixed evaluation reference date for all deterministic tests
 TODAY = date(2026, 11, 1)
@@ -516,8 +517,8 @@ class TestSeededInvoicesScoreRegression:
 
     def test_all_seeded_invoices_expected_scores(self):
         """Pin scores and priorities for all 16 seed demo invoices evaluated at reference date TODAY."""
-        from backend.seed import get_seed_invoices
         from backend.recovery.router import invoice_dict_to_input
+        from backend.seed import get_seed_invoices
 
         seed_invoices = get_seed_invoices(base_date=TODAY)
         assert len(seed_invoices) == 16, f"Expected 16 seed invoices, got {len(seed_invoices)}"
@@ -538,8 +539,8 @@ class TestSeededInvoicesScoreRegression:
 
     def test_inv_mod_007_exact_factor_breakdown(self):
         """INV-MOD-007 breakdown: 20 (days) + 12 (amount) + 6 (1 reminder) + 0 (on_time history) = 38."""
-        from backend.seed import get_seed_invoices
         from backend.recovery.router import invoice_dict_to_input
+        from backend.seed import get_seed_invoices
 
         seed_map = {inv["id"]: inv for inv in get_seed_invoices(base_date=TODAY)}
         inv_007 = invoice_dict_to_input(seed_map["INV-MOD-007"])
@@ -555,12 +556,11 @@ class TestSeededInvoicesScoreRegression:
 
     def test_reminder_grammar_singular_vs_plural(self):
         """Action reason must say '1 prior follow-up' (singular) vs 'X prior follow-ups' (plural)."""
-        from backend.recovery.actions import determine_next_best_action
 
         inv_1 = InvoiceInput(
             invoice_id="INV-G1",
-            total_amount=Decimal("500"),
-            outstanding_amount=Decimal("500"),
+            total_amount=Decimal(500),
+            outstanding_amount=Decimal(500),
             status="SENT",
             due_date=TODAY - timedelta(days=10),
             reminder_count=1,
@@ -571,8 +571,8 @@ class TestSeededInvoicesScoreRegression:
 
         inv_2 = InvoiceInput(
             invoice_id="INV-G2",
-            total_amount=Decimal("500"),
-            outstanding_amount=Decimal("500"),
+            total_amount=Decimal(500),
+            outstanding_amount=Decimal(500),
             status="SENT",
             due_date=TODAY - timedelta(days=5),
             reminder_count=0,

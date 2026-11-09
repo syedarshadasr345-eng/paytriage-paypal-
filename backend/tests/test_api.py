@@ -1,11 +1,12 @@
 from datetime import date
 from decimal import Decimal
+
 import pytest
 from fastapi.testclient import TestClient
 
 from backend.main import app
-from backend.seed import seed_database
 from backend.recovery.config import SCORING_VERSION
+from backend.seed import seed_database
 
 # Fixed evaluation reference date for deterministic testing
 TODAY = date(2026, 11, 1)

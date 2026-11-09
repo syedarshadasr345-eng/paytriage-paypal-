@@ -1,10 +1,9 @@
 from datetime import date
-from typing import Optional, List
-from backend.recovery.models import InvoiceInput, StrategyItem, StrategyEvaluation
-from backend.recovery.config import REMINDER_COOLDOWN_DAYS
+
+from backend.recovery.models import InvoiceInput, StrategyEvaluation, StrategyItem
 
 
-def evaluate_strategies(invoice: InvoiceInput, today: Optional[date] = None) -> StrategyEvaluation:
+def evaluate_strategies(invoice: InvoiceInput, today: date | None = None) -> StrategyEvaluation:
     """
     Evaluates recovery strategies for an invoice against verified facts.
     Pure logic: no network calls, no AI, no invented percentages.
@@ -24,7 +23,7 @@ def evaluate_strategies(invoice: InvoiceInput, today: Optional[date] = None) -> 
     has_active_promise = invoice.has_promise_to_pay and invoice.promise_due_date is not None and invoice.promise_due_date >= today
     has_broken_promise = invoice.has_promise_to_pay and invoice.promise_due_date is not None and invoice.promise_due_date < today
 
-    strategies: List[StrategyItem] = []
+    strategies: list[StrategyItem] = []
 
     # 1. Polite Reminder
     if status in ["PAID", "CANCELLED", "DISPUTED", "DRAFT"]:

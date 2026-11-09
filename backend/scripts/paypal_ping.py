@@ -12,14 +12,18 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
+from backend.paypal.auth import (
+    PayPalAuthError,
+    PayPalNotConfiguredError,
+    get_auth_manager,
+)
 from backend.paypal.config import (
+    PAYPAL_API_BASE,
     get_paypal_client_id,
     get_paypal_client_secret,
     is_paypal_configured,
-    PAYPAL_API_BASE,
     mask_credential,
 )
-from backend.paypal.auth import get_auth_manager, PayPalNotConfiguredError, PayPalAuthError
 
 
 def ping_paypal() -> dict:

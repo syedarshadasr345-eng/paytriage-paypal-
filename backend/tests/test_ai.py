@@ -18,18 +18,21 @@ Tests:
 
 from datetime import date
 from decimal import Decimal
-import json
+
 import pytest
 from fastapi.testclient import TestClient
 
-from backend.main import app
-from backend.seed import seed_database
-from backend.database import get_invoice_by_id, get_reminder_draft, get_activity_logs, clear_invoices
-from backend.ai.client import GeminiClient, set_ai_client, AIClientError
+from backend.ai.client import AIClientError, GeminiClient, set_ai_client
+from backend.ai.config import get_gemini_api_key
 from backend.ai.explainer import explain_invoice_recovery
 from backend.ai.reminders import generate_or_regenerate_reminder
-from backend.ai.assistant import ask_assistant
-from backend.ai.config import get_gemini_api_key, is_gemini_available
+from backend.database import (
+    get_activity_logs,
+    get_invoice_by_id,
+    get_reminder_draft,
+)
+from backend.main import app
+from backend.seed import seed_database
 
 TODAY = date(2026, 11, 1)
 
@@ -438,7 +441,7 @@ class TestTemplateBugFixes:
 
     def test_b1_unavailable_information_empty_when_all_populated(self, client):
         """B1: unavailable_information is [] when nothing is unavailable."""
-        from backend.database import insert_invoice, get_db_connection
+        from backend.database import get_db_connection, insert_invoice
         full_inv = {
             "id": "INV-TEST-FULL-001",
             "invoice_number": "INV-TEST-FULL-001",
@@ -491,15 +494,16 @@ class TestTemplateBugFixes:
     def test_b3_explanation_wording_only_mentions_applicable_rule(self):
         """B3: explanation wording only mentions the rule that applies."""
         from datetime import timedelta
-        from backend.recovery.models import InvoiceInput
+
         from backend.recovery.actions import determine_next_best_action
+        from backend.recovery.models import InvoiceInput
 
         # Case 1: 10-day overdue invoice (moderately overdue, NOT newly overdue)
         inv_10d = InvoiceInput(
             invoice_id="INV-10D",
             customer_name="Test",
-            total_amount=Decimal("500"),
-            outstanding_amount=Decimal("500"),
+            total_amount=Decimal(500),
+            outstanding_amount=Decimal(500),
             status="SENT",
             due_date=TODAY - timedelta(days=10),
             reminder_count=0,
@@ -513,8 +517,8 @@ class TestTemplateBugFixes:
         inv_3d = InvoiceInput(
             invoice_id="INV-3D",
             customer_name="Test",
-            total_amount=Decimal("500"),
-            outstanding_amount=Decimal("500"),
+            total_amount=Decimal(500),
+            outstanding_amount=Decimal(500),
             status="SENT",
             due_date=TODAY - timedelta(days=3),
             reminder_count=0,
@@ -527,8 +531,8 @@ class TestTemplateBugFixes:
         inv_20d = InvoiceInput(
             invoice_id="INV-20D",
             customer_name="Test",
-            total_amount=Decimal("500"),
-            outstanding_amount=Decimal("500"),
+            total_amount=Decimal(500),
+            outstanding_amount=Decimal(500),
             status="SENT",
             due_date=TODAY - timedelta(days=20),
             reminder_count=0,
@@ -542,8 +546,8 @@ class TestTemplateBugFixes:
         inv_rem2 = InvoiceInput(
             invoice_id="INV-REM2",
             customer_name="Test",
-            total_amount=Decimal("500"),
-            outstanding_amount=Decimal("500"),
+            total_amount=Decimal(500),
+            outstanding_amount=Decimal(500),
             status="SENT",
             due_date=TODAY - timedelta(days=5),
             reminder_count=2,

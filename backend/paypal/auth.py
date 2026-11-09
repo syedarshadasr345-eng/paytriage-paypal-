@@ -8,19 +8,18 @@ Features:
 - Redaction of client credentials in logs and errors.
 """
 
-import time
 import base64
 import logging
 import threading
-from typing import Optional, Tuple
+import time
+
 import httpx
 
 from backend.paypal.config import (
-    get_paypal_client_id,
-    get_paypal_client_secret,
-    is_paypal_configured,
     PAYPAL_API_BASE,
     PAYPAL_TIMEOUT_SECONDS,
+    get_paypal_client_id,
+    get_paypal_client_secret,
     mask_credential,
 )
 from backend.paypal.schemas import PayPalOAuthToken
@@ -30,19 +29,17 @@ logger = logging.getLogger("paytriage.paypal.auth")
 
 class PayPalAuthError(Exception):
     """Raised when PayPal authentication fails."""
-    pass
 
 
 class PayPalNotConfiguredError(PayPalAuthError):
     """Raised when PayPal credentials are not configured in environment."""
-    pass
 
 
 class PayPalAuthManager:
     """Manages cached PayPal OAuth access tokens with proactive refresh."""
 
     def __init__(self):
-        self._cached_token: Optional[str] = None
+        self._cached_token: str | None = None
         self._expires_at: float = 0.0
         self._lock = threading.Lock()
 
@@ -52,7 +49,7 @@ class PayPalAuthManager:
             self._cached_token = None
             self._expires_at = 0.0
 
-    def get_access_token(self, client: Optional[httpx.Client] = None) -> str:
+    def get_access_token(self, client: httpx.Client | None = None) -> str:
         """Retrieve valid PayPal access token from cache or request fresh token."""
         now = time.time()
         with self._lock:
@@ -65,7 +62,7 @@ class PayPalAuthManager:
             self._expires_at = expires_at
             return token
 
-    def _fetch_new_token(self, client: Optional[httpx.Client] = None) -> Tuple[str, float]:
+    def _fetch_new_token(self, client: httpx.Client | None = None) -> tuple[str, float]:
         """Request OAuth token from POST /v1/oauth2/token using HTTP Basic Auth."""
         client_id = get_paypal_client_id()
         client_secret = get_paypal_client_secret()
@@ -77,7 +74,7 @@ class PayPalAuthManager:
             )
 
         token_url = f"{PAYPAL_API_BASE}/v1/oauth2/token"
-        credentials = f"{client_id}:{client_secret}".encode("utf-8")
+        credentials = f"{client_id}:{client_secret}".encode()
         basic_auth = base64.b64encode(credentials).decode("utf-8")
 
         headers = {

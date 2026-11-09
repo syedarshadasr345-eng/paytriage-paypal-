@@ -4,11 +4,11 @@ Strictly conforms to phase3.md and RULES.md (§4, §6).
 Reads GEMINI_API_KEY from backend/.env or system environment.
 """
 
+import logging
 import os
 import re
-import logging
 from pathlib import Path
-from typing import Optional
+
 from dotenv import load_dotenv
 
 # Search and load backend/.env first, then root .env
@@ -35,7 +35,7 @@ AI_FORCE_IPV4 = os.getenv("AI_FORCE_IPV4", "true").lower() in ("true", "1", "yes
 logger = logging.getLogger("paytriage.ai")
 
 
-def get_gemini_api_key() -> Optional[str]:
+def get_gemini_api_key() -> str | None:
     """Retrieve Gemini API key strictly from environment.
     Never hardcoded. Returns None if unconfigured.
     """
@@ -50,7 +50,7 @@ def is_gemini_available() -> bool:
     return get_gemini_api_key() is not None
 
 
-def mask_secret(secret: Optional[str]) -> str:
+def mask_secret(secret: str | None) -> str:
     """Mask sensitive tokens or API keys for safe telemetry."""
     if not secret:
         return "[NOT_SET]"

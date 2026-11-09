@@ -1,24 +1,22 @@
 from datetime import date
-from decimal import Decimal
-from typing import List, Optional
 
+from backend.recovery.actions import RECOGNIZED_STATUSES, determine_next_best_action
 from backend.recovery.config import (
-    SCORING_VERSION,
-    DAYS_OVERDUE_WEIGHTS,
     AMOUNT_WEIGHTS_USD,
-    REMINDER_COUNT_WEIGHTS,
-    PAYMENT_HISTORY_POINTS,
-    CUSTOMER_HISTORY_MISSING_POINTS,
     BROKEN_PROMISE_POINTS,
     COMPONENT_D_MAX_POINTS,
+    CUSTOMER_HISTORY_MISSING_POINTS,
+    DAYS_OVERDUE_WEIGHTS,
+    PAYMENT_HISTORY_POINTS,
     PRIORITY_BANDS,
+    REMINDER_COUNT_WEIGHTS,
+    SCORING_VERSION,
 )
 from backend.recovery.models import (
+    ContributingFactor,
     InvoiceInput,
     InvoiceScoreResponse,
-    ContributingFactor,
 )
-from backend.recovery.actions import determine_next_best_action, RECOGNIZED_STATUSES
 
 
 def calculate_recovery_score(invoice: InvoiceInput, today: date) -> InvoiceScoreResponse:
@@ -68,8 +66,8 @@ def calculate_recovery_score(invoice: InvoiceInput, today: date) -> InvoiceScore
         )
 
     # 3. Actionable Invoices (OVERDUE, PARTIALLY_PAID)
-    contributing_factors: List[ContributingFactor] = []
-    unavailable_info: List[str] = []
+    contributing_factors: list[ContributingFactor] = []
+    unavailable_info: list[str] = []
 
     # Component A: Days Overdue (Up to 40 pts)
     comp_a_points = 0

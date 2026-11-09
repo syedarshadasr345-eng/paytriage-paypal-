@@ -1,6 +1,5 @@
 from datetime import date, timedelta
 from decimal import Decimal
-import pytest
 
 from backend.recovery.models import InvoiceInput
 from backend.recovery.strategies import evaluate_strategies

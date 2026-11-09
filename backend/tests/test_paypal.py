@@ -13,48 +13,44 @@ Tests:
 - Opt-in live smoke test (@pytest.mark.live_paypal, skipped by default)
 """
 
-import time
-import pytest
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
-from unittest.mock import MagicMock
+
 import httpx
+import pytest
 from fastapi.testclient import TestClient
 
+from backend.database import get_activity_logs, get_invoice_by_id
 from backend.main import app
-from backend.seed import seed_database
-from backend.database import get_invoice_by_id, get_activity_logs
-from backend.paypal.config import (
-    is_paypal_configured,
-    get_paypal_client_id,
-    get_paypal_client_secret,
-    mask_credential,
-    PAYPAL_MODE,
-    PAYPAL_API_BASE,
-)
 from backend.paypal.auth import (
-    PayPalAuthManager,
     PayPalAuthError,
+    PayPalAuthManager,
     PayPalNotConfiguredError,
 )
 from backend.paypal.client import (
-    PayPalClient,
     PayPalApiError,
+    PayPalClient,
+    PayPalDuplicateRequestError,
     PayPalNotFoundError,
     PayPalRateLimitError,
     PayPalTimeoutError,
-    PayPalNetworkError,
-    PayPalDuplicateRequestError,
+)
+from backend.paypal.config import (
+    get_paypal_client_id,
+    get_paypal_client_secret,
+    is_paypal_configured,
+    mask_credential,
 )
 from backend.paypal.invoices import (
     create_sandbox_invoice,
     get_sandbox_invoice,
     map_paypal_status_to_app,
-    sync_paypal_invoice,
-    send_sandbox_invoice,
     remind_sandbox_invoice,
+    send_sandbox_invoice,
+    sync_paypal_invoice,
     verify_sandbox_invoice_payment,
 )
+from backend.seed import seed_database
 
 TODAY = date(2026, 11, 1)
 
@@ -242,6 +238,32 @@ class TestPayPalInvoices:
         assert res.id == "INV2-TEST-CREATE-001"
         assert res.status == "DRAFT"
         assert res.amount.value == "2500.00"
+
+    def test_create_sandbox_invoice_missing_id_and_href_raises_error(self, monkeypatch):
+        """When PayPal creation response lacks both 'id' and 'href', PayPalApiError is raised."""
+        monkeypatch.setenv("PAYPAL_CLIENT_ID", "SANDBOX_CLIENT_ID_TEST")
+        monkeypatch.setenv("PAYPAL_CLIENT_SECRET", "SANDBOX_SECRET_TEST")
+
+        def handler(request: httpx.Request):
+            if request.url.path == "/v1/oauth2/token":
+                return httpx.Response(200, json={"access_token": "TOK123", "expires_in": 3600})
+            if request.url.path == "/v2/invoicing/invoices":
+                return httpx.Response(201, json={"message": "Created but unexpected shape"})
+            return httpx.Response(404)
+
+        mock_http = make_mock_client(handler)
+        client = PayPalClient(http_client=mock_http)
+
+        inv_data = {
+            "invoice_number": "INV-NO-ID",
+            "total_amount": "100.00",
+            "currency": "USD",
+        }
+        with pytest.raises(PayPalApiError) as exc_info:
+            create_sandbox_invoice(inv_data, client=client)
+
+        assert "PayPal did not return an invoice ID or href" in str(exc_info.value)
+        assert exc_info.value.status_code == 201
 
     def test_get_sandbox_invoice_details_and_resilient_unknown_fields(self, monkeypatch):
         """Step 3: Fetch invoice details; unknown/unexpected PayPal fields do not crash app."""

@@ -2,8 +2,8 @@ import os
 import sqlite3
 from datetime import date, datetime
 from decimal import Decimal
-from typing import List, Optional, Dict, Any
 from pathlib import Path
+from typing import Any
 
 DEFAULT_DB_PATH = Path(__file__).resolve().parent / "invoices.db"
 
@@ -15,7 +15,7 @@ def get_db_path() -> Path:
     return DEFAULT_DB_PATH
 
 
-def get_db_connection(db_path: Optional[Path] = None) -> sqlite3.Connection:
+def get_db_connection(db_path: Path | None = None) -> sqlite3.Connection:
     target_path = db_path or get_db_path()
     conn = sqlite3.connect(str(target_path))
     conn.row_factory = sqlite3.Row
@@ -23,8 +23,8 @@ def get_db_connection(db_path: Optional[Path] = None) -> sqlite3.Connection:
     return conn
 
 
-def init_db(db_path: Optional[Path] = None) -> None:
-    """Initialize database tables for invoices and audit activity logs."""
+def init_db(db_path: Path | None = None) -> None:
+    """Initialize database tables for invoices, audit activity logs, and human approvals."""
     conn = get_db_connection(db_path)
     with conn:
         conn.execute("""
@@ -45,7 +45,8 @@ def init_db(db_path: Optional[Path] = None) -> None:
                 promise_due_date TEXT,
                 notes TEXT,
                 is_demo INTEGER NOT NULL DEFAULT 1,
-                created_at TEXT NOT NULL
+                created_at TEXT NOT NULL,
+                merchant_id TEXT NOT NULL DEFAULT 'merchant_demo'
             );
         """)
         conn.execute("""
@@ -74,7 +75,27 @@ def init_db(db_path: Optional[Path] = None) -> None:
                 FOREIGN KEY (invoice_id) REFERENCES invoices (id)
             );
         """)
-        # Safe column addition if table already existed
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS approvals (
+                id TEXT PRIMARY KEY,
+                invoice_id TEXT NOT NULL,
+                action_type TEXT NOT NULL,
+                parameters_json TEXT NOT NULL,
+                hash TEXT NOT NULL,
+                status TEXT NOT NULL,
+                created_by TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                used_at TEXT,
+                merchant_id TEXT NOT NULL DEFAULT 'merchant_demo',
+                FOREIGN KEY (invoice_id) REFERENCES invoices (id)
+            );
+        """)
+        # Safe column additions if tables already existed
+        try:
+            conn.execute("ALTER TABLE invoices ADD COLUMN merchant_id TEXT NOT NULL DEFAULT 'merchant_demo';")
+        except sqlite3.OperationalError:
+            pass
         try:
             conn.execute("ALTER TABLE reminder_drafts ADD COLUMN fallback_reason TEXT;")
         except sqlite3.OperationalError:
@@ -82,7 +103,25 @@ def init_db(db_path: Optional[Path] = None) -> None:
     conn.close()
 
 
-def row_to_dict(row: sqlite3.Row) -> Dict[str, Any]:
+def get_verified_reminder_count(invoice_id: str, db_path: Path | None = None) -> int:
+    """Derive verified executed reminder count directly from audit activity logs.
+    Strictly conforms to phase5.md and docs/SCORING.md §4.3.
+    """
+    conn = get_db_connection(db_path)
+    try:
+        cur = conn.execute("""
+            SELECT COUNT(*) FROM activity_logs 
+            WHERE invoice_id = ? 
+              AND action_type IN ('paypal_remind', 'verified_reminder', 'record_copied_reminder', 'paypal_remind_verified', 'executed_reminder')
+              AND status IN ('success', 'verified', 'copied')
+        """, (invoice_id,))
+        count = cur.fetchone()[0]
+        return count
+    finally:
+        conn.close()
+
+
+def row_to_dict(row: sqlite3.Row, db_path: Path | None = None) -> dict[str, Any]:
     d = dict(row)
     # Parse dates and booleans for recovery engine consumption
     if d.get("due_date"):
@@ -100,34 +139,43 @@ def row_to_dict(row: sqlite3.Row) -> Dict[str, Any]:
     d["outstanding_amount"] = Decimal(d["outstanding_amount"])
     d["has_promise_to_pay"] = bool(d["has_promise_to_pay"])
     d["is_demo"] = bool(d["is_demo"])
+    d["merchant_id"] = d.get("merchant_id") or "merchant_demo"
+
+    # Derive reminder_count dynamically from verified executed reminders in activity_logs
+    verified_reminders = get_verified_reminder_count(d["id"], db_path=db_path)
+    if verified_reminders > 0:
+        d["reminder_count"] = verified_reminders
+    else:
+        d["reminder_count"] = int(d.get("reminder_count", 0))
+
     return d
 
 
-def get_all_invoices(db_path: Optional[Path] = None) -> List[Dict[str, Any]]:
+def get_all_invoices(db_path: Path | None = None) -> list[dict[str, Any]]:
     """Retrieve all invoices from SQLite."""
     conn = get_db_connection(db_path)
     try:
         cur = conn.execute("SELECT * FROM invoices ORDER BY due_date ASC")
         rows = cur.fetchall()
-        return [row_to_dict(r) for r in rows]
+        return [row_to_dict(r, db_path=db_path) for r in rows]
     finally:
         conn.close()
 
 
-def get_invoice_by_id(invoice_id: str, db_path: Optional[Path] = None) -> Optional[Dict[str, Any]]:
+def get_invoice_by_id(invoice_id: str, db_path: Path | None = None) -> dict[str, Any] | None:
     """Retrieve a single invoice by ID or invoice_number from SQLite."""
     conn = get_db_connection(db_path)
     try:
         cur = conn.execute("SELECT * FROM invoices WHERE id = ? OR invoice_number = ?", (invoice_id, invoice_id))
         row = cur.fetchone()
         if row:
-            return row_to_dict(row)
+            return row_to_dict(row, db_path=db_path)
         return None
     finally:
         conn.close()
 
 
-def insert_invoice(inv: Dict[str, Any], db_path: Optional[Path] = None) -> None:
+def insert_invoice(inv: dict[str, Any], db_path: Path | None = None) -> None:
     """Insert or replace an invoice record."""
     conn = get_db_connection(db_path)
     try:
@@ -138,8 +186,8 @@ def insert_invoice(inv: Dict[str, Any], db_path: Optional[Path] = None) -> None:
                     total_amount, outstanding_amount, currency, status,
                     due_date, reminder_count, last_reminder_date,
                     payment_history, has_promise_to_pay, promise_due_date,
-                    notes, is_demo, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    notes, is_demo, created_at, merchant_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 inv["id"],
                 inv.get("invoice_number", inv["id"]),
@@ -157,17 +205,19 @@ def insert_invoice(inv: Dict[str, Any], db_path: Optional[Path] = None) -> None:
                 inv["promise_due_date"].isoformat() if isinstance(inv.get("promise_due_date"), (date, datetime)) else inv.get("promise_due_date"),
                 inv.get("notes"),
                 1 if inv.get("is_demo", True) else 0,
-                inv.get("created_at", datetime.now().isoformat())
+                inv.get("created_at", datetime.now().isoformat()),
+                inv.get("merchant_id", "merchant_demo"),
             ))
     finally:
         conn.close()
 
 
-def clear_invoices(db_path: Optional[Path] = None) -> None:
+def clear_invoices(db_path: Path | None = None) -> None:
     """Clear all records from database (used for testing and seeding)."""
     conn = get_db_connection(db_path)
     try:
         with conn:
+            conn.execute("DELETE FROM approvals;")
             conn.execute("DELETE FROM reminder_drafts;")
             conn.execute("DELETE FROM activity_logs;")
             conn.execute("DELETE FROM invoices;")
@@ -175,7 +225,7 @@ def clear_invoices(db_path: Optional[Path] = None) -> None:
         conn.close()
 
 
-def save_reminder_draft(draft: Dict[str, Any], db_path: Optional[Path] = None) -> None:
+def save_reminder_draft(draft: dict[str, Any], db_path: Path | None = None) -> None:
     """Insert or replace a reminder draft record."""
     conn = get_db_connection(db_path)
     try:
@@ -200,7 +250,7 @@ def save_reminder_draft(draft: Dict[str, Any], db_path: Optional[Path] = None) -
         conn.close()
 
 
-def get_reminder_draft(draft_id: str, db_path: Optional[Path] = None) -> Optional[Dict[str, Any]]:
+def get_reminder_draft(draft_id: str, db_path: Path | None = None) -> dict[str, Any] | None:
     """Retrieve a single reminder draft by ID."""
     conn = get_db_connection(db_path)
     try:
@@ -211,7 +261,7 @@ def get_reminder_draft(draft_id: str, db_path: Optional[Path] = None) -> Optiona
         conn.close()
 
 
-def update_reminder_draft(draft_id: str, updates: Dict[str, Any], db_path: Optional[Path] = None) -> Optional[Dict[str, Any]]:
+def update_reminder_draft(draft_id: str, updates: dict[str, Any], db_path: Path | None = None) -> dict[str, Any] | None:
     """Update fields of an existing reminder draft."""
     conn = get_db_connection(db_path)
     try:
@@ -231,7 +281,7 @@ def update_reminder_draft(draft_id: str, updates: Dict[str, Any], db_path: Optio
         conn.close()
 
 
-def list_reminder_drafts(invoice_id: Optional[str] = None, db_path: Optional[Path] = None) -> List[Dict[str, Any]]:
+def list_reminder_drafts(invoice_id: str | None = None, db_path: Path | None = None) -> list[dict[str, Any]]:
     """List reminder drafts, optionally filtered by invoice_id."""
     conn = get_db_connection(db_path)
     try:
@@ -248,10 +298,10 @@ def log_activity(
     invoice_id: str,
     action_type: str,
     status: str,
-    details: Optional[str] = None,
-    log_id: Optional[str] = None,
-    db_path: Optional[Path] = None,
-) -> Dict[str, Any]:
+    details: str | None = None,
+    log_id: str | None = None,
+    db_path: Path | None = None,
+) -> dict[str, Any]:
     """Record an audit trail activity log entry."""
     import uuid
     conn = get_db_connection(db_path)
@@ -275,7 +325,7 @@ def log_activity(
         conn.close()
 
 
-def get_activity_logs(invoice_id: Optional[str] = None, db_path: Optional[Path] = None) -> List[Dict[str, Any]]:
+def get_activity_logs(invoice_id: str | None = None, db_path: Path | None = None) -> list[dict[str, Any]]:
     """Retrieve activity logs, optionally filtered by invoice_id."""
     conn = get_db_connection(db_path)
     try:
@@ -283,6 +333,95 @@ def get_activity_logs(invoice_id: Optional[str] = None, db_path: Optional[Path] 
             cur = conn.execute("SELECT * FROM activity_logs WHERE invoice_id = ? ORDER BY timestamp DESC", (invoice_id,))
         else:
             cur = conn.execute("SELECT * FROM activity_logs ORDER BY timestamp DESC")
+        return [dict(r) for r in cur.fetchall()]
+    finally:
+        conn.close()
+
+
+def save_approval(approval: dict[str, Any], db_path: Path | None = None) -> None:
+    """Insert or update a proposed action approval record."""
+    conn = get_db_connection(db_path)
+    try:
+        with conn:
+            conn.execute("""
+                INSERT OR REPLACE INTO approvals (
+                    id, invoice_id, action_type, parameters_json, hash,
+                    status, created_by, created_at, expires_at, used_at, merchant_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                approval["id"],
+                approval["invoice_id"],
+                approval["action_type"],
+                approval["parameters_json"],
+                approval["hash"],
+                approval["status"],
+                approval["created_by"],
+                approval["created_at"],
+                approval["expires_at"],
+                approval.get("used_at"),
+                approval.get("merchant_id", "merchant_demo"),
+            ))
+    finally:
+        conn.close()
+
+
+def get_approval_by_id(approval_id: str, db_path: Path | None = None) -> dict[str, Any] | None:
+    """Retrieve an approval record by its ID."""
+    conn = get_db_connection(db_path)
+    try:
+        cur = conn.execute("SELECT * FROM approvals WHERE id = ?", (approval_id,))
+        row = cur.fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def update_approval_status(
+    approval_id: str,
+    status: str,
+    used_at: str | None = None,
+    db_path: Path | None = None,
+) -> dict[str, Any] | None:
+    """Update approval status and used_at atomically."""
+    conn = get_db_connection(db_path)
+    try:
+        with conn:
+            if used_at:
+                conn.execute(
+                    "UPDATE approvals SET status = ?, used_at = ? WHERE id = ?",
+                    (status, used_at, approval_id),
+                )
+            else:
+                conn.execute(
+                    "UPDATE approvals SET status = ? WHERE id = ?",
+                    (status, approval_id),
+                )
+        return get_approval_by_id(approval_id, db_path=db_path)
+    finally:
+        conn.close()
+
+
+def list_approvals(
+    invoice_id: str | None = None,
+    merchant_id: str | None = None,
+    db_path: Path | None = None,
+) -> list[dict[str, Any]]:
+    """List approvals optionally filtered by invoice_id and merchant_id."""
+    conn = get_db_connection(db_path)
+    try:
+        clauses = []
+        params = []
+        if invoice_id:
+            clauses.append("invoice_id = ?")
+            params.append(invoice_id)
+        if merchant_id:
+            clauses.append("merchant_id = ?")
+            params.append(merchant_id)
+        query = "SELECT * FROM approvals"
+        if clauses:
+            query += " WHERE " + " AND ".join(clauses)
+        query += " ORDER BY created_at DESC"
+        cur = conn.execute(query, params)
         return [dict(r) for r in cur.fetchall()]
     finally:
         conn.close()

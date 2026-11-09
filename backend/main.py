@@ -1,17 +1,20 @@
 import os
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.database import init_db, get_all_invoices
-from backend.seed import seed_database
-from backend.recovery.router import router as recovery_router
+from backend.actions.router import router as actions_router
+from backend.ai.config import GEMINI_MODEL, is_gemini_available
 from backend.ai.router import router as ai_router
-from backend.paypal.router import router as paypal_router
+from backend.auth.router import router as auth_router
+from backend.config import APP_NAME, APP_PACKAGE_NAME, APP_TAGLINE
+from backend.database import get_all_invoices, init_db
 from backend.paypal.config import is_paypal_configured
-from backend.ai.config import is_gemini_available, GEMINI_MODEL
+from backend.paypal.router import router as paypal_router
 from backend.recovery.config import SCORING_VERSION
-from backend.config import APP_NAME, APP_TAGLINE, APP_PACKAGE_NAME
+from backend.recovery.router import router as recovery_router
+from backend.seed import seed_database
 
 
 @asynccontextmanager
@@ -52,6 +55,8 @@ app.add_middleware(
 app.include_router(recovery_router)
 app.include_router(ai_router)
 app.include_router(paypal_router)
+app.include_router(auth_router)
+app.include_router(actions_router)
 
 
 @app.get("/api/health", tags=["health"])

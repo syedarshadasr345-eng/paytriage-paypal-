@@ -7,18 +7,17 @@ Wraps Google GenAI SDK with timeouts, retries, safe logging, and mockability.
 import json
 import logging
 import time
-from typing import Optional, Dict, Any, Type
+from typing import Any
+
 import httpx
 from pydantic import BaseModel
 
 from backend.ai.config import (
-    get_gemini_api_key,
-    is_gemini_available,
-    GEMINI_MODEL,
-    AI_TIMEOUT_SECONDS,
-    AI_MAX_RETRIES,
     AI_FORCE_IPV4,
-    mask_secret,
+    AI_MAX_RETRIES,
+    AI_TIMEOUT_SECONDS,
+    GEMINI_MODEL,
+    get_gemini_api_key,
     redact_sensitive_data,
 )
 
@@ -27,22 +26,18 @@ logger = logging.getLogger("paytriage.ai.client")
 
 class AIClientError(Exception):
     """Base exception for AI client failures."""
-    pass
 
 
 class AITimeoutError(AIClientError):
     """Raised when the AI provider request times out."""
-    pass
 
 
 class AIProviderUnavailableError(AIClientError):
     """Raised when the AI provider API key is not configured or service is unreachable."""
-    pass
 
 
 class AISchemaValidationError(AIClientError):
     """Raised when the AI returns output that does not match the expected schema."""
-    pass
 
 
 class GeminiClient:
@@ -50,7 +45,7 @@ class GeminiClient:
     Supports timeouts, retries, safe telemetry, and test mocking.
     """
 
-    def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
+    def __init__(self, api_key: str | None = None, model: str | None = None):
         self._api_key = api_key or get_gemini_api_key()
         self.model = model or GEMINI_MODEL
         self._sdk_client = None
@@ -92,9 +87,9 @@ class GeminiClient:
     def generate_content(
         self,
         prompt: str,
-        system_instruction: Optional[str] = None,
+        system_instruction: str | None = None,
         json_mode: bool = True,
-        response_schema: Optional[Type[BaseModel]] = None,
+        response_schema: type[BaseModel] | None = None,
     ) -> str:
         """Call Gemini model with timeouts, retries, and error redaction.
         Returns the raw string output from the model.
@@ -106,7 +101,7 @@ class GeminiClient:
         timeout_ms = int(AI_TIMEOUT_SECONDS * 1000)
         http_options = types.HttpOptions(timeout=timeout_ms)
 
-        config_kwargs: Dict[str, Any] = {
+        config_kwargs: dict[str, Any] = {
             "temperature": 0.2,  # Low temperature for grounded recovery intelligence
             "http_options": http_options,
         }
@@ -178,9 +173,9 @@ class GeminiClient:
     def generate_json(
         self,
         prompt: str,
-        system_instruction: Optional[str] = None,
-        response_schema: Optional[Type[BaseModel]] = None,
-    ) -> Dict[str, Any]:
+        system_instruction: str | None = None,
+        response_schema: type[BaseModel] | None = None,
+    ) -> dict[str, Any]:
         """Generate structured JSON from Gemini, verifying JSON validity."""
         raw_text = self.generate_content(
             prompt=prompt,
@@ -210,7 +205,7 @@ class GeminiClient:
 
 
 # Default singleton instance for application use
-_default_client: Optional[GeminiClient] = None
+_default_client: GeminiClient | None = None
 
 
 def get_ai_client() -> GeminiClient:
@@ -221,7 +216,7 @@ def get_ai_client() -> GeminiClient:
     return _default_client
 
 
-def set_ai_client(client: Optional[GeminiClient]) -> None:
+def set_ai_client(client: GeminiClient | None) -> None:
     """Override AI client for unit tests / mocking."""
     global _default_client
     _default_client = client

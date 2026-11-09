@@ -7,10 +7,10 @@ Exposes setup status only. PayPal consequential operations remain protected serv
 from fastapi import APIRouter
 
 from backend.paypal.config import (
-    is_paypal_configured,
-    PAYPAL_MODE,
     PAYPAL_API_BASE,
+    PAYPAL_MODE,
     get_paypal_client_id,
+    is_paypal_configured,
     mask_credential,
 )
 from backend.paypal.schemas import PayPalStatusResponse

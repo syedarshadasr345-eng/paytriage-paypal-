@@ -1,6 +1,6 @@
 from datetime import date
-from decimal import Decimal, ROUND_HALF_UP
-from typing import List, Optional
+from decimal import ROUND_HALF_UP, Decimal
+
 from pydantic import BaseModel, Field, model_validator
 
 
@@ -14,17 +14,17 @@ class ContributingFactor(BaseModel):
 class InvoiceInput(BaseModel):
     invoice_id: str
     customer_name: str = "Customer"
-    customer_email: Optional[str] = None
+    customer_email: str | None = None
     total_amount: Decimal
     outstanding_amount: Decimal
     currency: str = "USD"
     status: str
     due_date: date
     reminder_count: int = Field(default=0, ge=0)
-    last_reminder_date: Optional[date] = None
-    payment_history: Optional[str] = None  # "on_time", "mixed", "late", or None
+    last_reminder_date: date | None = None
+    payment_history: str | None = None  # "on_time", "mixed", "late", or None
     has_promise_to_pay: bool = False
-    promise_due_date: Optional[date] = None
+    promise_due_date: date | None = None
 
     @model_validator(mode="after")
     def validate_amounts_and_promise(self) -> "InvoiceInput":
@@ -57,12 +57,12 @@ class InvoiceScoreResponse(BaseModel):
     status: str
     is_actionable: bool
     days_overdue: int
-    score: Optional[int] = None
-    priority: Optional[str] = None
-    contributing_factors: List[ContributingFactor] = []
+    score: int | None = None
+    priority: str | None = None
+    contributing_factors: list[ContributingFactor] = []
     recommended_action: str
     action_reason: str
-    unavailable_information: List[str] = []
+    unavailable_information: list[str] = []
     explanation_summary: str
     scoring_version: str
     evaluated_at: date
@@ -80,4 +80,4 @@ class StrategyItem(BaseModel):
 class StrategyEvaluation(BaseModel):
     invoice_id: str
     recommended_strategy: str
-    strategies: List[StrategyItem]
+    strategies: list[StrategyItem]

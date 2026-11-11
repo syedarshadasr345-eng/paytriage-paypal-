@@ -26,7 +26,8 @@ export interface ScoreFactor {
 }
 
 export interface QueueItem {
-  invoice_id: string
+  id: string
+  invoice_id?: string
   invoice_number: string
   customer_name: string
   customer_email?: string
@@ -52,7 +53,8 @@ export interface QueueSummary {
 }
 
 export interface InvoiceDetail {
-  invoice_id: string
+  id?: string
+  invoice_id?: string
   score: number
   priority: Priority
   due_date: string
@@ -63,10 +65,11 @@ export interface InvoiceDetail {
   status: string
   recommended_action: string
   action_reason: string
-  contributing_factors: ScoreFactor[]
-  has_assumption_flag: boolean
+  contributing_factors?: ScoreFactor[]
+  has_assumption_flag?: boolean
   assumption_reason?: string
-  unavailable_data_points: string[]
+  unavailable_information?: string[]
+  unavailable_data_points?: string[]
   customer_name?: string
   customer_email?: string
   is_demo?: boolean

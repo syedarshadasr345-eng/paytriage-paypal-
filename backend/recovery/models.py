@@ -31,8 +31,10 @@ class InvoiceInput(BaseModel):
         # Amount must be strictly positive
         if self.total_amount <= Decimal("0.00"):
             raise ValueError("total_amount must be greater than zero.")
-        if self.outstanding_amount <= Decimal("0.00"):
+        if self.status not in ("PAID", "CANCELLED") and self.outstanding_amount <= Decimal("0.00"):
             raise ValueError("outstanding_amount must be greater than zero.")
+        if self.outstanding_amount < Decimal("0.00"):
+            raise ValueError("outstanding_amount cannot be negative.")
         if self.outstanding_amount > self.total_amount:
             raise ValueError("outstanding_amount cannot exceed total_amount.")
 

@@ -115,6 +115,10 @@ export const InvoiceDetailView: React.FC<InvoiceDetailViewProps> = ({
     }
   }
 
+  const invId = detail.id || detail.invoice_id || invoiceId
+  const factors = detail.contributing_factors || []
+  const unavailable = detail.unavailable_information || detail.unavailable_data_points || []
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
       {/* Navigation & Header */}
@@ -133,7 +137,7 @@ export const InvoiceDetailView: React.FC<InvoiceDetailViewProps> = ({
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
               <h2 style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--text-main)" }}>
-                {detail.invoice_id}
+                {invId}
               </h2>
               <span className={`badge ${getPriorityBadge(detail.priority)}`}>
                 {detail.priority} (Score {detail.score})
@@ -152,7 +156,7 @@ export const InvoiceDetailView: React.FC<InvoiceDetailViewProps> = ({
 
         <button
           className="btn-primary"
-          onClick={() => onDraftReminder(detail.invoice_id)}
+          onClick={() => onDraftReminder(invId)}
           style={{ display: "flex", alignItems: "center", gap: "0.375rem" }}
         >
           <Send size={14} />
@@ -214,7 +218,7 @@ export const InvoiceDetailView: React.FC<InvoiceDetailViewProps> = ({
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-            {detail.contributing_factors.map((factor, idx) => (
+            {factors.map((factor, idx) => (
               <div
                 key={idx}
                 style={{
@@ -247,13 +251,13 @@ export const InvoiceDetailView: React.FC<InvoiceDetailViewProps> = ({
           </div>
 
           {/* Unavailable data notices */}
-          {detail.unavailable_data_points.length > 0 && (
+          {unavailable.length > 0 && (
             <div style={{ marginTop: "1rem", paddingTop: "0.75rem", borderTop: "1px solid var(--border-color)" }}>
               <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-muted)", marginBottom: "0.375rem" }}>
                 UNAVAILABLE DATA POINTS (NO POINTS ASSIGNED):
               </div>
               <ul style={{ paddingLeft: "1.25rem", fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                {detail.unavailable_data_points.map((pt, i) => (
+                {unavailable.map((pt, i) => (
                   <li key={i}>{pt}</li>
                 ))}
               </ul>

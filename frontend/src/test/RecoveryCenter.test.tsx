@@ -9,6 +9,7 @@ const mockQueue: QueueSummary = {
   total_outstanding_usd: 8700,
   items: [
     {
+      id: "INV2-5NY5-V2PK-CASX-WNU2",
       invoice_id: "INV2-5NY5-V2PK-CASX-WNU2",
       invoice_number: "INV-SANDBOX-001",
       customer_name: "Acme Enterprise Corp",
@@ -27,6 +28,7 @@ const mockQueue: QueueSummary = {
       is_demo: false,
     },
     {
+      id: "INV-NEW-006",
       invoice_id: "INV-NEW-006",
       invoice_number: "INV-2026-006",
       customer_name: "Starlight Digital Ltd",

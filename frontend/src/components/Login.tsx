@@ -6,8 +6,8 @@ import { ShieldCheck, LogIn, AlertCircle } from "lucide-react"
 
 export const Login: React.FC = () => {
   const { login } = useAuth()
-  const [username, setUsername] = useState("merchant@example.com")
-  const [password, setPassword] = useState("paytriage2026")
+  const [username, setUsername] = useState("")
+  const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -28,12 +28,6 @@ export const Login: React.FC = () => {
     } finally {
       setLoading(false)
     }
-  }
-
-  const fillDemoCredentials = () => {
-    setUsername("merchant@example.com")
-    setPassword("paytriage2026")
-    setError(null)
   }
 
   return (
@@ -130,21 +124,11 @@ export const Login: React.FC = () => {
           marginTop: "1.5rem",
           paddingTop: "1rem",
           borderTop: "1px solid var(--border-color)",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
+          textAlign: "center",
           fontSize: "0.75rem",
           color: "var(--text-muted)"
         }}>
-          <span>Demo Sandbox Account:</span>
-          <button
-            type="button"
-            className="btn-secondary btn-sm"
-            onClick={fillDemoCredentials}
-            style={{ fontSize: "0.75rem" }}
-          >
-            Auto-fill Credentials
-          </button>
+          <span>Authenticate with merchant account configured in backend environment</span>
         </div>
       </div>
     </div>

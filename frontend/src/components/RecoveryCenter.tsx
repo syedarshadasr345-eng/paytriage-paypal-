@@ -60,7 +60,8 @@ export const RecoveryCenter: React.FC<RecoveryCenterProps> = ({
         // Search
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase()
-          const matchId = item.invoice_id.toLowerCase().includes(q)
+          const invId = (item.id || item.invoice_id || "").toLowerCase()
+          const matchId = invId.includes(q)
           const matchNum = item.invoice_number.toLowerCase().includes(q)
           const matchCust = item.customer_name.toLowerCase().includes(q)
           if (!matchId && !matchNum && !matchCust) return false
@@ -285,11 +286,12 @@ export const RecoveryCenter: React.FC<RecoveryCenterProps> = ({
             </thead>
             <tbody>
               {filteredItems.map((item) => {
-                const isSelected = selectedInvoiceId === item.invoice_id
+                const invId = item.id || item.invoice_id || ""
+                const isSelected = selectedInvoiceId === invId
                 return (
                   <tr
-                    key={item.invoice_id}
-                    onClick={() => onSelectInvoice(item.invoice_id)}
+                    key={invId}
+                    onClick={() => onSelectInvoice(invId)}
                     style={{
                       borderBottom: "1px solid var(--border-color)",
                       backgroundColor: isSelected ? "var(--primary-light)" : "transparent",
@@ -325,7 +327,7 @@ export const RecoveryCenter: React.FC<RecoveryCenterProps> = ({
                     {/* Invoice ID / Number */}
                     <td style={{ padding: "0.875rem 1rem" }}>
                       <div style={{ fontWeight: 600, color: "var(--text-main)" }}>
-                        {item.invoice_id}
+                        {invId}
                       </div>
                       <div style={{ color: "var(--text-muted)", fontSize: "0.75rem" }}>
                         {item.invoice_number}
@@ -403,7 +405,7 @@ export const RecoveryCenter: React.FC<RecoveryCenterProps> = ({
                         style={{ display: "inline-flex", alignItems: "center", gap: "0.25rem" }}
                         onClick={(e) => {
                           e.stopPropagation()
-                          onSelectInvoice(item.invoice_id)
+                          onSelectInvoice(invId)
                         }}
                       >
                         <span>Examine</span>

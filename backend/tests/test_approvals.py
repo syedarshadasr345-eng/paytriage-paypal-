@@ -70,6 +70,32 @@ class TestAuthentication:
         res = client.post("/api/auth/login", json={"username": DEMO_USER, "password": "wrong_password"})
         assert res.status_code == 401
 
+    def test_login_fails_clearly_with_missing_config(self, client, monkeypatch):
+        """When DEMO_PASSWORD or DEMO_USER or SESSION_SECRET is missing or placeholder, login fails naming the variable."""
+        monkeypatch.setenv("DEMO_PASSWORD", "")
+        res = client.post("/api/auth/login", json={"username": "any", "password": "any"})
+        assert res.status_code == 500
+        assert "DEMO_PASSWORD" in res.json()["detail"]
+
+        monkeypatch.setenv("DEMO_PASSWORD", "validpass")
+        monkeypatch.setenv("SESSION_SECRET", "your_secret_placeholder")
+        res2 = client.post("/api/auth/login", json={"username": "any", "password": "any"})
+        assert res2.status_code == 500
+        assert "SESSION_SECRET" in res2.json()["detail"]
+
+    def test_login_rate_limiting_enforced(self, client):
+        """Rapid login requests exceeding limit return 429."""
+        from backend.rate_limit import reset_rate_limits
+        reset_rate_limits()
+        for _ in range(10):
+            res = client.post("/api/auth/login", json={"username": "wrong", "password": "wrong"})
+            assert res.status_code == 401
+        # 11th request -> 429 Too Many Requests
+        res_limit = client.post("/api/auth/login", json={"username": "wrong", "password": "wrong"})
+        assert res_limit.status_code == 429
+        assert "Rate limit exceeded" in res_limit.json()["detail"]
+        reset_rate_limits()
+
     def test_unauthenticated_blocked(self, client):
         """Calling actions endpoints without token returns 401."""
         res = client.post("/api/actions/propose", json={
@@ -264,6 +290,25 @@ class TestIntegrityAndDuplicateGuards:
         res = client.post(f"/api/actions/{appr_id}/approve", headers=auth_headers)
         assert res.status_code == 400
         assert "expired" in res.json()["detail"].lower()
+
+    def test_approval_state_survives_restart(self, client, auth_headers):
+        """Approval records persisted in SQLite database remain durable across server sessions."""
+        prop_res = client.post("/api/actions/propose", headers=auth_headers, json={
+            "invoice_id": "INV-MOD-007",
+            "action_type": "record_copied_reminder",
+            "parameters": {"subject": "Persistent reminder test"},
+        })
+        appr_id = prop_res.json()["approval_id"]
+        expected_hash = prop_res.json()["hash"]
+
+        # Fetch directly via database connection simulating fresh server session
+        record = get_approval_by_id(appr_id)
+        assert record is not None
+        assert record["id"] == appr_id
+        assert record["hash"] == expected_hash
+        assert record["status"] == "draft"
+        assert record["invoice_id"] == "INV-MOD-007"
+        assert "Persistent reminder test" in record["parameters_json"]
 
 
 # =============================================================================

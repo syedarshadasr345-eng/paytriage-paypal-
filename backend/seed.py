@@ -315,15 +315,96 @@ def get_seed_invoices(base_date: date) -> list[dict[str, Any]]:
     ]
 
 
+def get_live_sandbox_invoices(base_date: date) -> list[dict[str, Any]]:
+    """Live PayPal Sandbox invoices synchronized with merchant developer portal."""
+    return [
+        {
+            "id": "INV2-5NY5-V2PK-CASX-WNU2",
+            "invoice_number": "INV2-5NY5-V2PK-CASX-WNU2",
+            "customer_name": "Sandbox Client Alpha",
+            "customer_email": "alpha-buyer@sandbox.paypal.com",
+            "total_amount": Decimal("1200.00"),
+            "outstanding_amount": Decimal("1200.00"),
+            "currency": "USD",
+            "status": "SENT",
+            "due_date": base_date - timedelta(days=5),
+            "reminder_count": 0,
+            "last_reminder_date": None,
+            "payment_history": "unknown",
+            "has_promise_to_pay": False,
+            "promise_due_date": None,
+            "notes": "[LIVE SANDBOX] Active PayPal Sandbox invoice sent to recipient.",
+            "is_demo": False,
+        },
+        {
+            "id": "INV2-URFG-QJSC-KE3A-HPNC",
+            "invoice_number": "INV2-URFG-QJSC-KE3A-HPNC",
+            "customer_name": "Sandbox Client Beta",
+            "customer_email": "beta-buyer@sandbox.paypal.com",
+            "total_amount": Decimal("650.00"),
+            "outstanding_amount": Decimal("650.00"),
+            "currency": "USD",
+            "status": "SENT",
+            "due_date": base_date - timedelta(days=5),
+            "reminder_count": 0,
+            "last_reminder_date": None,
+            "payment_history": "unknown",
+            "has_promise_to_pay": False,
+            "promise_due_date": None,
+            "notes": "[LIVE SANDBOX] Active PayPal Sandbox invoice sent to recipient.",
+            "is_demo": False,
+        },
+        {
+            "id": "INV2-2PD4-YD9P-TRAV-T9XK",
+            "invoice_number": "INV2-2PD4-YD9P-TRAV-T9XK",
+            "customer_name": "Sandbox Client Gamma",
+            "customer_email": "gamma-buyer@sandbox.paypal.com",
+            "total_amount": Decimal("3100.00"),
+            "outstanding_amount": Decimal("3100.00"),
+            "currency": "USD",
+            "status": "SENT",
+            "due_date": base_date - timedelta(days=5),
+            "reminder_count": 0,
+            "last_reminder_date": None,
+            "payment_history": "unknown",
+            "has_promise_to_pay": False,
+            "promise_due_date": None,
+            "notes": "[LIVE SANDBOX] Active PayPal Sandbox invoice sent to recipient.",
+            "is_demo": False,
+        },
+        {
+            "id": "INV2-LVUD-8WNU-FBMX-MYZH",
+            "invoice_number": "INV2-LVUD-8WNU-FBMX-MYZH",
+            "customer_name": "Sandbox Client Delta",
+            "customer_email": "delta-buyer@sandbox.paypal.com",
+            "total_amount": Decimal("4800.00"),
+            "outstanding_amount": Decimal("4800.00"),
+            "currency": "USD",
+            "status": "SENT",
+            "due_date": base_date - timedelta(days=5),
+            "reminder_count": 0,
+            "last_reminder_date": None,
+            "payment_history": "unknown",
+            "has_promise_to_pay": False,
+            "promise_due_date": None,
+            "notes": "[LIVE SANDBOX] Active PayPal Sandbox invoice sent to recipient.",
+            "is_demo": False,
+        },
+    ]
+
+
 def seed_database(base_date: date = date.today()) -> int:
-    """Populate SQLite database with benchmark demo records.
+    """Populate SQLite database with benchmark demo records and live sandbox invoices.
     Also creates verified activity log entries so reminder_count can be
     derived from verified executed reminders in activity_logs.
     """
     init_db()
     clear_invoices()
     records = get_seed_invoices(base_date)
-    for inv in records:
+    sandbox_records = get_live_sandbox_invoices(base_date)
+    all_records = records + sandbox_records
+
+    for inv in all_records:
         insert_invoice(inv)
         rem_count = int(inv.get("reminder_count", 0))
         for r_idx in range(1, rem_count + 1):
@@ -335,7 +416,7 @@ def seed_database(base_date: date = date.today()) -> int:
                 details=f"Verified historical reminder {r_idx} delivered on {rem_date}.",
                 log_id=f"ACT-SEED-{inv['id']}-{r_idx}",
             )
-    return len(records)
+    return len(all_records)
 
 
 if __name__ == "__main__":

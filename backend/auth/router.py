@@ -10,12 +10,14 @@ from pydantic import BaseModel, Field
 
 from backend.auth.config import (
     DEFAULT_MERCHANT_ID,
-    DEMO_USER,
     create_session_token,
+    get_demo_user,
+    get_missing_auth_config,
     verify_password,
     verify_session_token,
 )
 from backend.auth.service import get_current_user
+from backend.rate_limit import rate_limiter
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -37,20 +39,28 @@ class LoginResponse(BaseModel):
     user: UserProfile
 
 
-@router.post("/login", response_model=LoginResponse)
+@router.post("/login", response_model=LoginResponse, dependencies=[Depends(rate_limiter("login"))])
 def login(req: LoginRequest):
     """Authenticate merchant and issue signed session token."""
-    username_clean = req.username.strip().lower()
-    demo_clean = DEMO_USER.strip().lower()
+    missing = get_missing_auth_config()
+    if missing:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Authentication configuration missing or placeholder: {', '.join(missing)}",
+        )
 
-    if username_clean != demo_clean or not verify_password(req.password):
+    demo_user = get_demo_user()
+    username_clean = req.username.strip().lower()
+    demo_clean = (demo_user or "").strip().lower()
+
+    if not demo_user or username_clean != demo_clean or not verify_password(req.password):
         raise HTTPException(
             status_code=401,
             detail="Invalid credentials. Please verify your merchant username and password.",
         )
 
     token = create_session_token(
-        user_email=DEMO_USER,
+        user_email=demo_user,
         merchant_id=DEFAULT_MERCHANT_ID,
         role="merchant",
         expires_in_hours=24,
@@ -60,7 +70,7 @@ def login(req: LoginRequest):
         access_token=token,
         token_type="bearer",
         user=UserProfile(
-            email=DEMO_USER,
+            email=demo_user,
             merchant_id=DEFAULT_MERCHANT_ID,
             role="merchant",
         ),

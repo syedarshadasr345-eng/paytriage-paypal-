@@ -5,7 +5,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-from backend.database import get_all_invoices, get_invoice_by_id
+from backend.database import get_activity_logs, get_all_invoices, get_invoice_by_id
 from backend.recovery.config import SCORING_VERSION
 from backend.recovery.models import (
     ContributingFactor,
@@ -370,3 +370,9 @@ def get_dashboard_stats(
         demo_count=demo_count,
         recent_activity=recent_logs,
     )
+
+
+@router.get("/audit-logs", response_model=list[dict[str, Any]])
+def get_audit_logs_endpoint(invoice_id: str | None = Query(None)):
+    """Retrieve immutable recovery audit activity logs."""
+    return get_activity_logs(invoice_id=invoice_id)

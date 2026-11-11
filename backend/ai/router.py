@@ -13,7 +13,7 @@ Endpoints:
 
 from datetime import date
 
-from fastapi import APIRouter, HTTPException, Path, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 
 from backend.ai.assistant import ask_assistant
 from backend.ai.explainer import explain_invoice_recovery
@@ -33,11 +33,12 @@ from backend.ai.schemas import (
     ReminderEditRequest,
 )
 from backend.database import get_invoice_by_id, get_reminder_draft, list_reminder_drafts
+from backend.rate_limit import rate_limiter
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
 
-@router.post("/invoices/{id}/explain", response_model=ExplanationResponse)
+@router.post("/invoices/{id}/explain", response_model=ExplanationResponse, dependencies=[Depends(rate_limiter("ai"))])
 def explain_invoice_endpoint(
     id: str = Path(..., description="Invoice ID to explain"),
     req: ExplanationRequest | None = None,
@@ -53,7 +54,7 @@ def explain_invoice_endpoint(
         raise HTTPException(status_code=500, detail=f"Explanation generation failed: {e!s}")
 
 
-@router.post("/invoices/{id}/reminder", response_model=ReminderDraftResponse)
+@router.post("/invoices/{id}/reminder", response_model=ReminderDraftResponse, dependencies=[Depends(rate_limiter("ai"))])
 def generate_reminder_endpoint(
     id: str = Path(..., description="Invoice ID to draft reminder for"),
     req: ReminderCreateRequest | None = None,
@@ -114,7 +115,7 @@ def copy_reminder_endpoint(
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.post("/assistant", response_model=AssistantResponse)
+@router.post("/assistant", response_model=AssistantResponse, dependencies=[Depends(rate_limiter("assistant"))])
 def assistant_endpoint(
     req: AssistantMessageRequest,
     today: date | None = Query(None, description="Optional ISO evaluation reference date"),

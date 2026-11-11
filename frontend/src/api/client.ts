@@ -98,8 +98,18 @@ export const api = {
   getQueue: (includeNotDue = true): Promise<QueueSummary> =>
     request<QueueSummary>(`/api/recovery/queue?include_not_due=${includeNotDue}`),
 
-  getInvoiceDetail: (invoiceId: string): Promise<InvoiceDetail> =>
-    request<InvoiceDetail>(`/api/recovery/invoices/${encodeURIComponent(invoiceId)}`),
+  getInvoiceDetail: async (invoiceId: string): Promise<InvoiceDetail> => {
+    const raw = await request<any>(`/api/recovery/invoices/${encodeURIComponent(invoiceId)}`)
+    const inv = raw.invoice || raw
+    return {
+      ...inv,
+      id: inv.id || inv.invoice_id || invoiceId,
+      invoice_id: inv.id || inv.invoice_id || invoiceId,
+      contributing_factors: raw.contributing_factors || inv.contributing_factors || [],
+      unavailable_information: inv.unavailable_information || [],
+      explanation_summary: raw.explanation_summary,
+    }
+  },
 
   getInvoiceStrategies: (invoiceId: string): Promise<StrategyComparison> =>
     request<StrategyComparison>(`/api/recovery/invoices/${encodeURIComponent(invoiceId)}/strategies`),

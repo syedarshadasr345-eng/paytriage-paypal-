@@ -112,4 +112,7 @@ def isolate_paypal_environment(request):
 
     from backend.paypal.auth import get_auth_manager
     get_auth_manager().clear_cache()
+    from backend.rate_limit import reset_rate_limits
+    reset_rate_limits()
     yield
+    reset_rate_limits()

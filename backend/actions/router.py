@@ -21,8 +21,9 @@ from backend.actions.service import (
 )
 from backend.auth.service import get_current_user, require_merchant_user
 from backend.database import get_approval_by_id, list_approvals
+from backend.rate_limit import rate_limiter
 
-router = APIRouter(prefix="/api/actions", tags=["actions"])
+router = APIRouter(prefix="/api/actions", tags=["actions"], dependencies=[Depends(rate_limiter("actions"))])
 
 
 @router.post("/propose", response_model=ActionProposeResponse)

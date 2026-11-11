@@ -277,12 +277,14 @@ export const ReminderEditor: React.FC<ReminderEditorProps> = ({
           >
             {invoice?.is_demo ? (
               <option value="record_copied_reminder">Record Copied Reminder (Demo Allowed)</option>
+            ) : invoice?.status === "DRAFT" ? (
+              <>
+                <option value="paypal_send_invoice">PayPal Send Invoice (Draft Invoices)</option>
+                <option value="record_copied_reminder">Record Copied Reminder (Manual Outreach)</option>
+              </>
             ) : (
               <>
                 <option value="paypal_remind_invoice">PayPal Remind Invoice (Live Sandbox)</option>
-                {invoice?.status === "DRAFT" && (
-                  <option value="paypal_send_invoice">PayPal Send Invoice (Draft Invoices)</option>
-                )}
                 <option value="record_copied_reminder">Record Copied Reminder (Manual Outreach)</option>
               </>
             )}

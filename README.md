@@ -177,3 +177,4 @@ Captures step-by-step screenshots to `docs/screenshots/` (Login, Command Center,
 1. **AI Live Quota & Timeout Fallback:** On free-tier Gemini API quotas, high demand may trigger rate limits (`429 RESOURCE_EXHAUSTED`) or timeouts. PayTriage handles this by falling back to deterministic template generation with `fallback_reason="timeout"` or `"quota"`.
 2. **Currency Scope:** Quantitative balance scoring rules are calibrated for USD invoices. Non-USD invoices receive 0 amount points and include an unavailable-information notice.
 3. **Demo Data Boundary:** Benchmark demo invoices (`is_demo=True`) are restricted to `record_copied_reminder`. Only live Sandbox invoices (`is_demo=False`) can dispatch real PayPal API calls.
+

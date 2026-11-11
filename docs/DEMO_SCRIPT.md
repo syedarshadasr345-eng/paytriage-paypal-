@@ -35,3 +35,4 @@
 - **Visual:** Activity Log view.
 - **Narration:** "The reminder is transmitted directly through PayPal Invoicing v2 and verified against PayPal APIs. The immutable activity log labels verified transmissions strictly as 'Verified & Sent'. PayTriage brings intelligence, transparency, and safety to cash flow recovery."
 - **Action:** Highlight verified record in the audit trail. Show PayPal Sandbox Connected badge.
+

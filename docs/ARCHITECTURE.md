@@ -29,3 +29,4 @@ flowchart TD
 4. **AI Grounded Explainer & Assistant (`backend/ai/`)**: Integrates `gemini-3.8-flash` with strict JSON schemas, XML boundary delimiters against prompt injection, and deterministic rule-based template fallback upon timeout or quota limits.
 5. **PayPal Invoicing v2 Service (`backend/paypal/`)**: OAuth client credentials token manager with thread-safe caching and expiry buffer. Supports invoice synchronization, status mapping, live transmission, and verification.
 6. **Human Approval Gate (`backend/actions/`)**: Pre-action proposal generating SHA-256 payload digest. Enforces merchant human approval (AI agents cannot approve or execute) and rejects modified parameters with HTTP 409 Conflict.
+

@@ -8,3 +8,4 @@
 
 ## Next
 - Phase 7: Final submission documentation (README.md, LICENSE, ARCHITECTURE.md, SCORING.md, DEMO_SCRIPT.md), claim audits, fresh-clone verification, and final submission report.
+

@@ -4,12 +4,13 @@ Strictly conforms to phase5.md and RULES.md (§7, §9).
 All tests are mock-based with zero live external calls.
 """
 
+import os
 from datetime import date, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
 
-from backend.auth.config import DEMO_PASSWORD, DEMO_USER, create_session_token
+from backend.auth.config import create_session_token, get_demo_user
 from backend.database import (
     get_approval_by_id,
     get_invoice_by_id,
@@ -34,7 +35,8 @@ def client():
 
 @pytest.fixture
 def auth_headers():
-    token = create_session_token(DEMO_USER, merchant_id="merchant_demo", role="merchant")
+    username = get_demo_user() or "test_merchant@example.com"
+    token = create_session_token(username, merchant_id="merchant_demo", role="merchant")
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -57,17 +59,20 @@ def other_merchant_headers():
 class TestAuthentication:
     def test_login_success(self, client):
         """Valid credentials return a signed bearer token and user profile."""
-        res = client.post("/api/auth/login", json={"username": DEMO_USER, "password": DEMO_PASSWORD})
+        username = get_demo_user() or "test_merchant@example.com"
+        password = os.getenv("DEMO_PASSWORD") or "test_mock_password_2026"
+        res = client.post("/api/auth/login", json={"username": username, "password": password})
         assert res.status_code == 200
         data = res.json()
         assert "access_token" in data
         assert data["token_type"] == "bearer"
-        assert data["user"]["email"] == DEMO_USER
+        assert data["user"]["email"] == username
         assert data["user"]["role"] == "merchant"
 
     def test_login_invalid_password(self, client):
         """Invalid credentials return clean 401."""
-        res = client.post("/api/auth/login", json={"username": DEMO_USER, "password": "wrong_password"})
+        username = get_demo_user() or "test_merchant@example.com"
+        res = client.post("/api/auth/login", json={"username": username, "password": "wrong_password"})
         assert res.status_code == 401
 
     def test_login_fails_clearly_with_missing_config(self, client, monkeypatch):

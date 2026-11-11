@@ -9,6 +9,14 @@ import os
 import re
 from typing import Any
 
+# Set isolated test credentials for test suite when running in clean test environments
+if not os.getenv("SESSION_SECRET") or os.getenv("SESSION_SECRET").startswith("your_"):
+    os.environ["SESSION_SECRET"] = "test_mock_session_secret_32_characters_long_2026"
+if not os.getenv("DEMO_USER") or os.getenv("DEMO_USER").startswith("your_"):
+    os.environ["DEMO_USER"] = "test_merchant@example.com"
+if not os.getenv("DEMO_PASSWORD") or os.getenv("DEMO_PASSWORD").startswith("your_"):
+    os.environ["DEMO_PASSWORD"] = "test_mock_password_2026"
+
 import pytest
 from pydantic import BaseModel
 

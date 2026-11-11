@@ -71,7 +71,7 @@ Official PayPal Invoicing V2 statuses are mapped deterministically to PayTriage 
 
 Live test run completed on 2026-11-08:
 - **Sandbox Base URL**: `https://api-m.sandbox.paypal.com`
-- **Client ID**: `Ac5C...JwAZ` (verified Indian developer account)
+- **Client ID**: Configured in backend/.env (verified Indian developer account)
 - **Created Invoice ID**: `INV2-7KYA-LFY4-CL67-Q5N6`
 - **Initial Status**: `DRAFT` ($250.00 USD)
 - **Sent Status**: `SENT` (payer-view URL generated: `https://www.sandbox.paypal.com/invoice/p/#INV2-7KYA-LFY4-CL67-Q5N6`)
